@@ -1,12 +1,10 @@
 import type { MetadataRoute } from "next"
+import { siteConfig } from "@/config/site"
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://krit-portfolio-liard.vercel.app"
-
   return [
     {
-      url: baseUrl,
-      lastModified: new Date(),
+      url: siteConfig.url,
       changeFrequency: "monthly",
       priority: 1,
     },

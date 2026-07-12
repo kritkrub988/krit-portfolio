@@ -1,13 +1,24 @@
 "use client"
 
 import { Menu, X } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Container from "@/components/common/Container"
 import Button from "@/components/ui/Button"
 import { navigationItems } from "@/data/navigation"
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false)
+    }
+
+    window.addEventListener("keydown", closeOnEscape)
+    return () => window.removeEventListener("keydown", closeOnEscape)
+  }, [isOpen])
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/85 backdrop-blur-xl">
@@ -42,6 +53,8 @@ export default function Navbar() {
           <button
             type="button"
             aria-label="Toggle menu"
+            aria-expanded={isOpen}
+            aria-controls="mobile-navigation"
             onClick={() => setIsOpen(!isOpen)}
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-800 lg:hidden"
           >
@@ -50,7 +63,10 @@ export default function Navbar() {
         </nav>
 
         {isOpen && (
-          <div className="border-t border-slate-100 py-4 lg:hidden">
+          <div
+            id="mobile-navigation"
+            className="border-t border-slate-100 py-4 lg:hidden"
+          >
             <div className="flex flex-col gap-2">
               {navigationItems.map((item) => (
                 <a

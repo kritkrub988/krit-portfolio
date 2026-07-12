@@ -1,16 +1,35 @@
-type ButtonProps = {
-  children: React.ReactNode
+import type {
+  AnchorHTMLAttributes,
+  ButtonHTMLAttributes,
+  ReactNode,
+} from "react"
+
+type SharedProps = {
+  children: ReactNode
   variant?: "primary" | "secondary"
-  href?: string
 }
+
+type AnchorProps = SharedProps &
+  AnchorHTMLAttributes<HTMLAnchorElement> & {
+    href: string
+  }
+
+type NativeButtonProps = SharedProps &
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    href?: undefined
+  }
+
+type ButtonProps = AnchorProps | NativeButtonProps
 
 export default function Button({
   children,
   variant = "primary",
   href,
+  className = "",
+  ...props
 }: ButtonProps) {
   const base =
-    "inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold transition hover:-translate-y-0.5"
+    "inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
 
   const styles = {
     primary:
@@ -21,11 +40,23 @@ export default function Button({
 
   if (href) {
     return (
-      <a href={href} className={`${base} ${styles[variant]}`}>
+      <a
+        href={href}
+        className={`${base} ${styles[variant]} ${className}`}
+        {...(props as AnchorHTMLAttributes<HTMLAnchorElement>)}
+      >
         {children}
       </a>
     )
   }
 
-  return <button className={`${base} ${styles[variant]}`}>{children}</button>
+  return (
+    <button
+      type="button"
+      className={`${base} ${styles[variant]} ${className}`}
+      {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}
+    >
+      {children}
+    </button>
+  )
 }

@@ -1,5 +1,7 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import { seoConfig } from "@/config/seo"
+import { siteConfig } from "@/config/site"
 import "./globals.css"
 
 const inter = Inter({
@@ -8,38 +10,39 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteConfig.url),
   title: {
-    default: "Krit | AI, Data & Digital Builder",
-    template: "%s | Krit",
+    default: seoConfig.title,
+    template: `%s | ${siteConfig.personName}`,
   },
-  description:
-    "Personal portfolio website for AI, data dashboards, web applications, and content automation systems.",
-  keywords: [
-    "Krit",
-    "AI Builder",
-    "Data Dashboard",
-    "Web Developer",
-    "Next.js",
-    "React",
-    "Power BI",
-    "AI Agent",
-    "Digital Builder",
-  ],
-  authors: [{ name: "Krit" }],
-  creator: "Krit",
+  description: seoConfig.description,
+  keywords: [...seoConfig.keywords],
+  authors: [{ name: siteConfig.personName, url: siteConfig.url }],
+  creator: siteConfig.personName,
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
-    title: "Krit | AI, Data & Digital Builder",
-    description:
-      "I build AI solutions, data dashboards, web applications, and content automation systems.",
+    title: seoConfig.title,
+    description: seoConfig.openGraphDescription,
+    url: "/",
     type: "website",
     locale: "en_US",
     siteName: "Krit Portfolio",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: seoConfig.title,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Krit | AI, Data & Digital Builder",
-    description:
-      "Personal portfolio website for AI, data, web application, and content automation projects.",
+    title: seoConfig.title,
+    description: seoConfig.description,
+    images: ["/opengraph-image"],
   },
   robots: {
     index: true,

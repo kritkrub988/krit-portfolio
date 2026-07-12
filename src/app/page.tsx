@@ -7,18 +7,25 @@ import SkillsSection from "@/components/sections/SkillsSection"
 import ProjectsSection from "@/components/sections/ProjectsSection"
 import ServicesSection from "@/components/sections/ServicesSection"
 import ContactSection from "@/components/sections/ContactSection"
+import { siteConfig } from "@/config/site"
+import { socialLinks } from "@/config/social"
 
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "Person",
-  name: "Krit",
-  jobTitle: "AI, Data & Digital Builder",
-  description:
-    "Personal portfolio website for AI, data dashboards, web applications, and content automation systems.",
-  url: "https://krit-portfolio.vercel.app",
-  sameAs: [
-    "https://line.me/ti/p/RvtTijuB7O",
-  ],
+  name: siteConfig.personName,
+  jobTitle: siteConfig.role,
+  description: siteConfig.description,
+  url: siteConfig.url,
+  email: `mailto:${siteConfig.email}`,
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Phitsanulok",
+    addressCountry: "TH",
+  },
+  sameAs: socialLinks
+    .filter((link) => link.href.startsWith("https://"))
+    .map((link) => link.href),
   knowsAbout: [
     "AI",
     "Data Analytics",
