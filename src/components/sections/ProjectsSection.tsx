@@ -20,17 +20,11 @@ export default function ProjectsSection() {
             </h2>
           </div>
 
-          <a
-            href="#contact"
-            className="text-sm font-bold text-blue-600 transition hover:text-violet-600"
-          >
-            View All Projects
-          </a>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-          {projects.map((project, index) => (
-            <MotionWrapper key={project.title} delay={0.06 * index}>
+          {projects.map((project, index) => {
+            const projectCard = (
               <Card className="group h-full overflow-hidden">
                 <div className="relative h-36 overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 sm:h-40">
                   <Image
@@ -53,8 +47,26 @@ export default function ProjectsSection() {
                   </p>
                 </div>
               </Card>
-            </MotionWrapper>
-          ))}
+            )
+
+            return (
+              <MotionWrapper key={project.title} delay={0.06 * index}>
+                {project.href ? (
+                  <a
+                    href={project.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Open ${project.title} resource in a new tab`}
+                    className="block h-full rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+                  >
+                    {projectCard}
+                  </a>
+                ) : (
+                  projectCard
+                )}
+              </MotionWrapper>
+            )
+          })}
         </div>
       </Container>
     </Section>
