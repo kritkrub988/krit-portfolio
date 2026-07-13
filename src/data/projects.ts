@@ -23,7 +23,7 @@ export const projects: Project[] = [
     technologies: ["Power BI", "SQL", "Data Analytics"],
     overview:
       "An analytics dashboard concept that turns operational data into clear metrics, trends, and decision-ready insights.",
-    href: "https://script.google.com/macros/s/AKfycbyPQI7ce0pdETxZbPOGMTO6JqzxMkwSSUvKBztVRteDoiWZ2Ro3ibzBe_fxYnt6vrFS/exec",
+    href: "https://datastudio.google.com/reporting/df06a97a-dd4e-4858-960d-016b28118044/page/hji3F",
   },
   {
     title: "KRIT HUB AI - Local AI Content Marketing",
@@ -42,5 +42,6 @@ export const projects: Project[] = [
     technologies: ["React", "TypeScript", "PostgreSQL"],
     overview:
       "An internal application concept focused on simplifying management workflows and keeping operational information accessible.",
+    href: "https://script.google.com/macros/s/AKfycbyPQI7ce0pdETxZbPOGMTO6JqzxMkwSSUvKBztVRteDoiWZ2Ro3ibzBe_fxYnt6vrFS/exec",
   },
 ]
