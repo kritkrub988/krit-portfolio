@@ -23,6 +23,7 @@ export const projects: Project[] = [
     technologies: ["Power BI", "SQL", "Data Analytics"],
     overview:
       "An analytics dashboard concept that turns operational data into clear metrics, trends, and decision-ready insights.",
+    href: "https://script.google.com/macros/s/AKfycbyPQI7ce0pdETxZbPOGMTO6JqzxMkwSSUvKBztVRteDoiWZ2Ro3ibzBe_fxYnt6vrFS/exec",
   },
   {
     title: "KRIT HUB AI - Local AI Content Marketing",
