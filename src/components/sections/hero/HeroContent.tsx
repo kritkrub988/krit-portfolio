@@ -14,14 +14,21 @@ export default function HeroContent() {
         {profile.name}
       </h1>
 
-      <h2 className="mt-4 text-3xl font-extrabold tracking-tight lg:text-4xl">
+      <h2 className="mt-4 text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl lg:text-4xl">
         <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
-          AI, Data & Digital Builder
+          AI Consultant &amp; Personal Tutor
         </span>
       </h2>
 
-      <p className="mt-6 max-w-xl text-base leading-8 text-slate-700 lg:text-lg">
-        {profile.description}
+      <p
+        lang="th"
+        className="mt-5 max-w-xl text-base leading-7 tracking-normal text-slate-700 sm:text-lg sm:leading-8"
+      >
+        <span className="block">ที่ปรึกษาและติวเตอร์ด้าน AI</span>
+        <span className="block">สอนตั้งแต่พื้นฐานจนถึงการสร้าง</span>
+        <span className="block">
+          AI Agent, Dashboard และ Web Application
+        </span>
       </p>
 
       <div className="mt-8 flex flex-wrap justify-center gap-4 lg:justify-start">
