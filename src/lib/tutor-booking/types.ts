@@ -24,6 +24,7 @@ export interface BookingSummary {
   price_per_person: number
   total_price: number
   course_name: string
+  learning_format: LearningFormat
   status: "pending"
 }
 
@@ -41,3 +42,45 @@ export interface BookingErrorResponse {
 }
 
 export type BookingResponse = BookingSuccessResponse | BookingErrorResponse
+
+export interface AvailabilitySuccessResponse {
+  success: true
+  date: string
+  dayType: "weekday" | "weekend"
+  availableSlots: TimeSlot[]
+  unavailableSlots: TimeSlot[]
+}
+
+export type AvailabilityResponse = AvailabilitySuccessResponse | BookingErrorResponse
+
+export interface AdminBooking {
+  booking_reference: string
+  created_at: string
+  booking_date: string
+  time_slot: TimeSlot
+  customer_name: string
+  phone: string
+  number_of_students: 1 | 2 | 3 | 4
+  price_per_person: number
+  total_price: number
+  course_name: string
+  learning_format: LearningFormat
+  location: string
+  note: string
+  status: BookingStatus
+  line_user_id: string
+}
+
+export interface AdminBookingsResponse {
+  success: true
+  bookings: AdminBooking[]
+}
+
+export interface AdminStatusUpdateResponse {
+  success: true
+  booking_reference: string
+  status: BookingStatus
+}
+
+export type AdminListResponse = AdminBookingsResponse | BookingErrorResponse
+export type AdminUpdateResponse = AdminStatusUpdateResponse | BookingErrorResponse

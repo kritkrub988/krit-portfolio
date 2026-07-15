@@ -6,9 +6,16 @@ import {
   WEEKDAY_TIME_SLOTS,
   WEEKEND_TIME_SLOTS,
 } from "./constants.ts"
-import type { BookingRequest, BookingResponse, TimeSlot } from "./types.ts"
+import type {
+  AdminListResponse,
+  AdminUpdateResponse,
+  AvailabilityResponse,
+  BookingRequest,
+  BookingResponse,
+  TimeSlot,
+} from "./types.ts"
 
-function isRealIsoDate(value: string): boolean {
+export function isRealIsoDate(value: string): boolean {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
   if (!match) return false
 
@@ -79,7 +86,45 @@ export const bookingRequestSchema: z.ZodType<BookingRequest> = z
         message: "time_slot ไม่ใช่รอบที่เปิดให้จองในวันดังกล่าว",
       })
     }
+
+    if (booking.learning_format === "onsite" && !booking.location.trim()) {
+      context.addIssue({
+        code: "custom",
+        path: ["location"],
+        message: "กรุณาระบุสถานที่สำหรับการเรียนแบบ onsite",
+      })
+    }
   })
+
+export const bookingFormSchema = bookingRequestSchema.and(
+  z
+    .object({
+      consent: z.literal(true, { error: "กรุณายอมรับการใช้ข้อมูลเพื่อจัดการการจอง" }),
+      website: z.string().max(0, "ตรวจพบข้อมูลที่ไม่ควรมี"),
+      form_started_at: z.number().int().positive(),
+      submission_id: z.string().uuid(),
+    })
+    .strict(),
+)
+
+export function validateFormTiming(startedAt: number, now = Date.now()): boolean {
+  const elapsed = now - startedAt
+  return elapsed >= 1_500 && elapsed <= 86_400_000
+}
+
+export function toBookingRequest(value: z.infer<typeof bookingFormSchema>): BookingRequest {
+  return {
+    customer_name: value.customer_name,
+    phone: value.phone,
+    booking_date: value.booking_date,
+    time_slot: value.time_slot,
+    number_of_students: value.number_of_students,
+    learning_format: value.learning_format,
+    location: value.location,
+    note: value.note,
+    line_user_id: value.line_user_id,
+  }
+}
 
 const bookingSummarySchema = z
   .object({
@@ -90,6 +135,7 @@ const bookingSummarySchema = z
     price_per_person: z.number().nonnegative(),
     total_price: z.number().nonnegative(),
     course_name: z.string().min(1),
+    learning_format: z.enum(["onsite", "online"]),
     status: z.literal("pending"),
   })
   .strict()
@@ -118,6 +164,76 @@ const bookingResponseSchema: z.ZodType<BookingResponse> = z.discriminatedUnion("
 
 export function parseAppsScriptResponse(value: unknown): BookingResponse | null {
   const result = bookingResponseSchema.safeParse(value)
+  return result.success ? result.data : null
+}
+
+const availabilityResponseSchema: z.ZodType<AvailabilityResponse> = z.discriminatedUnion(
+  "success",
+  [
+    z
+      .object({
+        success: z.literal(true),
+        date: z.string().refine(isRealIsoDate),
+        dayType: z.enum(["weekday", "weekend"]),
+        availableSlots: z.array(z.enum(ALL_TIME_SLOTS)),
+        unavailableSlots: z.array(z.enum(ALL_TIME_SLOTS)),
+      })
+      .strict(),
+    bookingErrorResponseSchema,
+  ],
+)
+
+const adminBookingSchema = z
+  .object({
+    booking_reference: z.string().regex(/^KHA-\d{8}-[A-Z0-9]{6}$/),
+    created_at: z.string().min(1),
+    booking_date: z.string().refine(isRealIsoDate),
+    time_slot: z.enum(ALL_TIME_SLOTS),
+    customer_name: z.string(),
+    phone: z.string(),
+    number_of_students: studentCountSchema,
+    price_per_person: z.number().nonnegative(),
+    total_price: z.number().nonnegative(),
+    course_name: z.string(),
+    learning_format: z.enum(["onsite", "online"]),
+    location: z.string(),
+    note: z.string(),
+    status: z.enum(["pending", "confirmed", "cancelled"]),
+    line_user_id: z.string(),
+  })
+  .strict()
+
+const adminListResponseSchema: z.ZodType<AdminListResponse> = z.discriminatedUnion("success", [
+  z.object({ success: z.literal(true), bookings: z.array(adminBookingSchema) }).strict(),
+  bookingErrorResponseSchema,
+])
+
+const adminUpdateResponseSchema: z.ZodType<AdminUpdateResponse> = z.discriminatedUnion(
+  "success",
+  [
+    z
+      .object({
+        success: z.literal(true),
+        booking_reference: z.string().regex(/^KHA-\d{8}-[A-Z0-9]{6}$/),
+        status: z.enum(["pending", "confirmed", "cancelled"]),
+      })
+      .strict(),
+    bookingErrorResponseSchema,
+  ],
+)
+
+export function parseAvailabilityResponse(value: unknown): AvailabilityResponse | null {
+  const result = availabilityResponseSchema.safeParse(value)
+  return result.success ? result.data : null
+}
+
+export function parseAdminListResponse(value: unknown): AdminListResponse | null {
+  const result = adminListResponseSchema.safeParse(value)
+  return result.success ? result.data : null
+}
+
+export function parseAdminUpdateResponse(value: unknown): AdminUpdateResponse | null {
+  const result = adminUpdateResponseSchema.safeParse(value)
   return result.success ? result.data : null
 }
 
