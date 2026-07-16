@@ -31,11 +31,15 @@ function validateBookingRequest_(payload, settings) {
   var location = String(data.location || "").trim();
   var note = String(data.note || "").trim();
   var lineUserId = String(data.line_user_id || "").trim();
-  var numberOfStudents = Number(data.number_of_students);
+  var numberOfStudents = typeof data.number_of_students === "number"
+    ? data.number_of_students
+    : NaN;
   var parsedDate = parseBookingDate_(bookingDate);
 
   if (!customerName) errors.push("customer_name ต้องไม่ว่าง");
+  if (customerName.length > 150) errors.push("customer_name ยาวเกิน 150 ตัวอักษร");
   if (!phone) errors.push("phone ต้องไม่ว่าง");
+  if (phone.length > 50) errors.push("phone ยาวเกิน 50 ตัวอักษร");
   if (!parsedDate) errors.push("booking_date ต้องเป็นวันที่จริงในรูปแบบ YYYY-MM-DD");
   if (parsedDate) {
     var today = Utilities.formatDate(new Date(), settings.timezone, "yyyy-MM-dd");
@@ -50,6 +54,12 @@ function validateBookingRequest_(payload, settings) {
   if (["onsite", "online"].indexOf(learningFormat) === -1) {
     errors.push("learning_format ต้องเป็น onsite หรือ online");
   }
+  if (learningFormat === "onsite" && !location) {
+    errors.push("location ต้องไม่ว่างสำหรับการเรียน onsite");
+  }
+  if (location.length > 500) errors.push("location ยาวเกิน 500 ตัวอักษร");
+  if (note.length > 2000) errors.push("note ยาวเกิน 2000 ตัวอักษร");
+  if (lineUserId.length > 200) errors.push("line_user_id ยาวเกิน 200 ตัวอักษร");
 
   return {
     valid: errors.length === 0,

@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KRIT Portfolio + KRIT HUB AI Tutor
 
-## Getting Started
+เว็บไซต์ Portfolio ของ KRIT ที่ขยายด้วยระบบประชาสัมพันธ์หลักสูตร AI Tutor, ตารางราคา, ตรวจรอบว่าง, จองเรียน และหน้าผู้ดูแล โดยยังรักษาหน้า Portfolio และลิงก์ติดต่อเดิมไว้
 
-First, run the development server:
+## Routes
+
+| Route | หน้าที่ |
+| --- | --- |
+| `/` | Portfolio และทางเข้าสู่ AI Tutor |
+| `/tutor` | Landing page หลักสูตร |
+| `/tutor/course` | รายละเอียดหลักสูตร |
+| `/tutor/pricing` | ราคา 1–4 คน |
+| `/tutor/booking` | ฟอร์มตรวจรอบว่างและจอง |
+| `/tutor/booking/success` | ผลการจองที่ไม่แสดงข้อมูลส่วนตัว |
+| `/admin/bookings` | เข้าสู่ระบบและจัดการสถานะการจอง |
+
+API หลักคือ `GET /api/tutor/availability`, `POST /api/tutor/bookings`, `POST|DELETE /api/admin/session`, `GET /api/admin/bookings` และ `PATCH /api/admin/bookings/:reference`
+
+## Setup
 
 ```bash
+npm install
+copy .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ระบบต้องใช้ Google Apps Script Web App เป็นตัวกลางระหว่าง Next.js กับ Google Sheets ดูขั้นตอนใน `docs/KRIT_HUB_AI_TUTOR_GOOGLE_SHEETS_SETUP.md`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+เมื่อสร้างรายการจองสำเร็จ Apps Script จะส่งอีเมลแจ้งเตือนไปยัง `BOOKING_NOTIFICATION_EMAIL` หลังบันทึกข้อมูล โดยปัญหาการส่งอีเมลจะไม่ทำให้รายการจองสูญหาย
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment variables
 
-## Learn More
+| ชื่อ | ใช้ที่ใด | จำเป็น |
+| --- | --- | --- |
+| `GOOGLE_APPS_SCRIPT_WEB_APP_URL` | Server เท่านั้น; URL ลงท้าย `/exec` | Production booking |
+| `GOOGLE_APPS_SCRIPT_API_SECRET` | Server เท่านั้น; ต้องตรง Script Property | Production booking |
+| `ADMIN_PASSWORD` | รหัสผ่านผู้ดูแล | Admin |
+| `ADMIN_SESSION_SECRET` | ลงนาม session; สุ่มยาวอย่างน้อย 32 ตัวอักษร | Admin |
+| `NEXT_PUBLIC_APP_URL` | URL เว็บไซต์ canonical | แนะนำ |
+| `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` | รองรับ LINE ในอนาคต | ไม่จำเป็น |
 
-To learn more about Next.js, take a look at the following resources:
+ห้ามใส่ Secret ในตัวแปรที่ขึ้นต้น `NEXT_PUBLIC_` หรือ commit `.env.local`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Testing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
-## Deploy on Vercel
+ชุดทดสอบครอบคลุมราคา, วัน/เวลา Bangkok, validation, anti-spam, duplicate submission, rate limit, response จาก Apps Script, availability และ admin session
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deployment
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+โปรเจกต์เชื่อม Vercel ไว้แล้ว ตั้ง Environment Variables สำหรับ Production และ Preview จากนั้น deploy แล้วทดสอบ booking จริงหนึ่งรายการ ดู checklist ใน `docs/KRIT_HUB_AI_TUTOR_DEPLOYMENT_REPORT.md` และ `docs/KRIT_HUB_AI_TUTOR_OPERATIONS_RUNBOOK.md`
+
+## เอกสาร
+
+- คู่มือเจ้าของระบบ: `docs/KRIT_HUB_AI_TUTOR_SYSTEM_GUIDE.md`
+- คู่มือผู้สอน/ผู้เรียน: `docs/KRIT_HUB_AI_TUTOR_INSTRUCTOR_GUIDE.md`, `docs/KRIT_HUB_AI_TUTOR_STUDENT_WORKBOOK.md`
+- คู่มือรวม 25 บท: `docs/KRIT_HUB_AI_TUTOR_COMPLETE_MANUAL.md`
+- Apps Script source: `integrations/google-apps-script/`

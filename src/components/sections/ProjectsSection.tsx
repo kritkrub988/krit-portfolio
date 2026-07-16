@@ -52,15 +52,25 @@ export default function ProjectsSection() {
             return (
               <MotionWrapper key={project.title} delay={0.06 * index}>
                 {project.href ? (
-                  <a
-                    href={project.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`Open ${project.title} resource in a new tab`}
-                    className="block h-full rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
-                  >
-                    {projectCard}
-                  </a>
+                  project.href.startsWith("/") ? (
+                    <a
+                      href={project.href}
+                      aria-label={`Open ${project.title}`}
+                      className="block h-full rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+                    >
+                      {projectCard}
+                    </a>
+                  ) : (
+                    <a
+                      href={project.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Open ${project.title} resource in a new tab`}
+                      className="block h-full rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+                    >
+                      {projectCard}
+                    </a>
+                  )
                 ) : (
                   projectCard
                 )}

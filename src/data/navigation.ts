@@ -4,5 +4,6 @@ export const navigationItems = [
   { label: "Projects", href: "#projects" },
   { label: "Skills", href: "#skills" },
   { label: "Services", href: "#services" },
+  { label: "AI Tutor", href: "/tutor" },
   { label: "Contact", href: "#contact" },
 ]

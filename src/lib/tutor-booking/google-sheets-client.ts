@@ -1,8 +1,21 @@
 import "server-only"
 
 import { GOOGLE_APPS_SCRIPT_TIMEOUT_MS } from "./constants.ts"
-import type { BookingRequest, BookingResponse } from "./types.ts"
-import { parseAppsScriptResponse } from "./validation.ts"
+import type {
+  AdminListResponse,
+  AdminUpdateResponse,
+  AvailabilityResponse,
+  BookingErrorResponse,
+  BookingRequest,
+  BookingResponse,
+  BookingStatus,
+} from "./types.ts"
+import {
+  parseAdminListResponse,
+  parseAdminUpdateResponse,
+  parseAppsScriptResponse,
+  parseAvailabilityResponse,
+} from "./validation.ts"
 
 interface GoogleAppsScriptConfig {
   url: string
@@ -16,58 +29,43 @@ function getGoogleAppsScriptConfig(): GoogleAppsScriptConfig | null {
 
   try {
     const url = new URL(rawUrl)
-    if (url.protocol !== "https:") return null
+    if (url.protocol !== "https:" || !url.pathname.endsWith("/exec")) return null
     return { url: url.toString(), secret }
   } catch {
     return null
   }
 }
 
-function integrationError(code: string, message: string): BookingResponse {
+function integrationError(code: string, message: string): BookingErrorResponse {
   return { success: false, code, message }
 }
 
-export async function createTutorBooking(request: BookingRequest): Promise<BookingResponse> {
+async function callAppsScript(payload: Record<string, unknown>): Promise<unknown> {
   const config = getGoogleAppsScriptConfig()
   if (!config) {
     return integrationError(
       "INTEGRATION_NOT_CONFIGURED",
-      "ยังไม่ได้ตั้งค่า Google Apps Script Web App URL หรือ API Secret",
+      "ยังไม่ได้ตั้งค่า Google Apps Script Web App สำหรับระบบจอง",
     )
   }
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), GOOGLE_APPS_SCRIPT_TIMEOUT_MS)
-
   try {
     const response = await fetch(config.url, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-booking-api-secret": config.secret,
-      },
-      body: JSON.stringify({ ...request, api_secret: config.secret }),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...payload, api_secret: config.secret }),
       cache: "no-store",
       redirect: "follow",
       signal: controller.signal,
     })
-
     const text = await response.text()
-    let body: unknown
     try {
-      body = JSON.parse(text)
+      return JSON.parse(text) as unknown
     } catch {
       return integrationError("INVALID_UPSTREAM_JSON", "Apps Script ตอบกลับด้วย JSON ที่ไม่ถูกต้อง")
     }
-
-    const parsed = parseAppsScriptResponse(body)
-    if (!parsed) {
-      return integrationError(
-        "INVALID_UPSTREAM_RESPONSE",
-        "รูปแบบข้อมูลตอบกลับจาก Apps Script ไม่ถูกต้อง",
-      )
-    }
-    return parsed
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return integrationError("UPSTREAM_TIMEOUT", "Apps Script ใช้เวลาตอบกลับนานเกินกำหนด")
@@ -76,4 +74,43 @@ export async function createTutorBooking(request: BookingRequest): Promise<Booki
   } finally {
     clearTimeout(timeout)
   }
+}
+
+export async function createTutorBooking(request: BookingRequest): Promise<BookingResponse> {
+  const raw = await callAppsScript({ action: "createBooking", ...request })
+  return (
+    parseAppsScriptResponse(raw) ??
+    integrationError("INVALID_UPSTREAM_RESPONSE", "รูปแบบข้อมูลตอบกลับจาก Apps Script ไม่ถูกต้อง")
+  )
+}
+
+export async function getTutorAvailability(bookingDate: string): Promise<AvailabilityResponse> {
+  const raw = await callAppsScript({ action: "availability", booking_date: bookingDate })
+  return (
+    parseAvailabilityResponse(raw) ??
+    integrationError("INVALID_UPSTREAM_RESPONSE", "รูปแบบข้อมูลรอบว่างไม่ถูกต้อง")
+  )
+}
+
+export async function listTutorBookings(): Promise<AdminListResponse> {
+  const raw = await callAppsScript({ action: "listBookings", limit: 500 })
+  return (
+    parseAdminListResponse(raw) ??
+    integrationError("INVALID_UPSTREAM_RESPONSE", "รูปแบบรายการจองจาก Apps Script ไม่ถูกต้อง")
+  )
+}
+
+export async function updateTutorBookingStatus(
+  bookingReference: string,
+  status: BookingStatus,
+): Promise<AdminUpdateResponse> {
+  const raw = await callAppsScript({
+    action: "updateStatus",
+    booking_reference: bookingReference,
+    status,
+  })
+  return (
+    parseAdminUpdateResponse(raw) ??
+    integrationError("INVALID_UPSTREAM_RESPONSE", "รูปแบบผลการแก้สถานะไม่ถูกต้อง")
+  )
 }

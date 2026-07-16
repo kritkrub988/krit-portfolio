@@ -25,6 +25,31 @@ function doPost(event) {
     }
 
     delete payload.api_secret;
+    var action = String(payload.action || "createBooking");
+    delete payload.action;
+
+    if (action === "availability") {
+      return handleAvailability_(payload.booking_date);
+    }
+    if (action === "listBookings") {
+      return handleListBookings_(payload.limit);
+    }
+    if (action === "updateStatus") {
+      lock = LockService.getScriptLock();
+      if (!lock.tryLock(BOOKING_CONFIG.lockTimeoutMs)) {
+        return errorResponse_("LOCK_TIMEOUT", "ระบบกำลังประมวลผล กรุณาลองใหม่อีกครั้ง");
+      }
+      var updated = updateBookingStatus(payload.booking_reference, payload.status);
+      return jsonResponse_({
+        success: true,
+        booking_reference: updated.bookingReference,
+        status: updated.status,
+      });
+    }
+    if (action !== "createBooking") {
+      return errorResponse_("VALIDATION_ERROR", "ไม่รองรับ action ที่ระบุ");
+    }
+
     var settings = getSettings();
     var validation = validateBookingRequest_(payload, settings);
     if (!validation.valid) {
@@ -58,13 +83,17 @@ function doPost(event) {
     var pricing = getPricing(booking.numberOfStudents, settings);
     var createdAt = Utilities.formatDate(new Date(), settings.timezone, "yyyy-MM-dd HH:mm:ss");
 
-    bookings.appendRow([
+    var nextRow = bookings.getLastRow() + 1;
+    bookings.getRange(nextRow, 1, 1, 4).setNumberFormat("@");
+    bookings.getRange(nextRow, 6).setNumberFormat("@");
+    bookings.getRange(nextRow, 15).setNumberFormat("@");
+    bookings.getRange(nextRow, 1, 1, BOOKING_CONFIG.bookingHeaders.length).setValues([[
       bookingReference,
       createdAt,
       booking.bookingDate,
       booking.timeSlot,
       booking.customerName,
-      booking.phone,
+      "'" + booking.phone,
       booking.numberOfStudents,
       pricing.pricePerPerson,
       pricing.totalPrice,
@@ -74,9 +103,18 @@ function doPost(event) {
       booking.note,
       "pending",
       booking.lineUserId,
-    ]);
+    ]]);
 
     safeLog_("BOOKING_CREATED", bookingReference);
+    lock.releaseLock();
+    lock = null;
+
+    try {
+      notifyBookingCreated_(booking, bookingReference, pricing);
+    } catch (notificationError) {
+      safeLog_("BOOKING_NOTIFICATION_FAILED", bookingReference);
+    }
+
     return jsonResponse_({
       success: true,
       message: "จองเรียนเรียบร้อย",
@@ -88,6 +126,7 @@ function doPost(event) {
         price_per_person: pricing.pricePerPerson,
         total_price: pricing.totalPrice,
         course_name: settings.courseName,
+        learning_format: booking.learningFormat,
         status: "pending",
       },
     });
@@ -108,6 +147,58 @@ function doPost(event) {
   } finally {
     if (lock && lock.hasLock()) lock.releaseLock();
   }
+}
+
+function notifyBookingCreated_(booking, bookingReference, pricing) {
+  var configuredEmail = PropertiesService.getScriptProperties().getProperty(
+    "BOOKING_NOTIFICATION_EMAIL",
+  );
+  var recipient = String(configuredEmail || Session.getEffectiveUser().getEmail() || "").trim();
+  if (!recipient) {
+    throw new Error("CONFIGURATION_ERROR: booking notification email is missing");
+  }
+
+  var adminUrl = PropertiesService.getScriptProperties().getProperty(
+    "BOOKING_ADMIN_URL",
+  ) || "https://krit-portfolio-liard.vercel.app/admin/bookings";
+  var locationText = booking.learningFormat === "online"
+    ? "Online"
+    : "Onsite - " + booking.location;
+  var subject = "[KRIT HUB] มีการจองใหม่ " + bookingReference;
+  var lines = [
+    "มีการจอง AI Tutor ใหม่",
+    "",
+    "เลขอ้างอิง: " + bookingReference,
+    "ผู้จอง: " + booking.customerName,
+    "โทรศัพท์: " + booking.phone,
+    "วันที่: " + booking.bookingDate,
+    "เวลา: " + booking.timeSlot,
+    "รูปแบบ: " + locationText,
+    "จำนวนผู้เรียน: " + booking.numberOfStudents + " คน",
+    "ยอดรวม: " + pricing.totalPrice + " บาท",
+    "สถานะ: รอดำเนินการ",
+    booking.note ? "หมายเหตุ: " + booking.note : "",
+    "",
+    "จัดการรายการจอง: " + adminUrl,
+  ];
+
+  MailApp.sendEmail({
+    to: recipient,
+    subject: subject,
+    body: lines.join("\n"),
+    name: "KRIT HUB AI Tutor",
+  });
+  safeLog_("BOOKING_NOTIFICATION_SENT", bookingReference);
+}
+
+function authorizeBookingNotifications() {
+  var recipient = PropertiesService.getScriptProperties().getProperty(
+    "BOOKING_NOTIFICATION_EMAIL",
+  );
+  if (!recipient) {
+    throw new Error("CONFIGURATION_ERROR: booking notification email is missing");
+  }
+  return MailApp.getRemainingDailyQuota();
 }
 
 function parseJsonBody_(event) {
@@ -134,6 +225,70 @@ function isSlotUnavailable_(sheet, bookingDate, timeSlot) {
     return row[0] === bookingDate && row[1] === timeSlot &&
       (status === "pending" || status === "confirmed");
   });
+}
+
+function handleAvailability_(bookingDate) {
+  var settings = getSettings();
+  var parsedDate = parseBookingDate_(bookingDate);
+  if (!parsedDate) {
+    return errorResponse_("VALIDATION_ERROR", "วันที่ต้องเป็นวันที่จริงในรูปแบบ YYYY-MM-DD");
+  }
+  var today = Utilities.formatDate(new Date(), settings.timezone, "yyyy-MM-dd");
+  if (bookingDate < today) {
+    return errorResponse_("VALIDATION_ERROR", "ไม่สามารถตรวจรอบของวันที่ย้อนหลังได้");
+  }
+
+  var bookings = getSpreadsheet_().getSheetByName(BOOKING_CONFIG.bookingsSheetName);
+  if (!bookings) {
+    return errorResponse_("CONFIGURATION_ERROR", "ไม่พบ Sheet Bookings กรุณารัน initializeSheets");
+  }
+  var allowed = getAllowedSlotsForDate(bookingDate, settings);
+  var unavailable = allowed.filter(function (slot) {
+    return isSlotUnavailable_(bookings, bookingDate, slot);
+  });
+  var available = allowed.filter(function (slot) {
+    return unavailable.indexOf(slot) === -1;
+  });
+
+  return jsonResponse_({
+    success: true,
+    date: bookingDate,
+    dayType: parsedDate.dayOfWeek === 0 || parsedDate.dayOfWeek === 6 ? "weekend" : "weekday",
+    availableSlots: available,
+    unavailableSlots: unavailable,
+  });
+}
+
+function handleListBookings_(requestedLimit) {
+  var sheet = getSpreadsheet_().getSheetByName(BOOKING_CONFIG.bookingsSheetName);
+  if (!sheet) return errorResponse_("CONFIGURATION_ERROR", "ไม่พบ Sheet Bookings");
+  var limit = Number(requestedLimit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 500) limit = 200;
+  if (sheet.getLastRow() < 2) return jsonResponse_({ success: true, bookings: [] });
+
+  var rowCount = Math.min(limit, sheet.getLastRow() - 1);
+  var startRow = sheet.getLastRow() - rowCount + 1;
+  var rows = sheet.getRange(startRow, 1, rowCount, 15).getDisplayValues().reverse();
+  var bookings = rows.map(function (row) {
+    return {
+      booking_reference: row[0],
+      created_at: row[1],
+      booking_date: row[2],
+      time_slot: row[3],
+      customer_name: row[4],
+      phone: row[5],
+      number_of_students: Number(row[6]),
+      price_per_person: Number(row[7]),
+      total_price: Number(row[8]),
+      course_name: row[9],
+      learning_format: row[10],
+      location: row[11],
+      note: row[12],
+      status: row[13],
+      line_user_id: row[14],
+    };
+  });
+  return jsonResponse_({ success: true, bookings: bookings });
 }
 
 function createUniqueBookingReference_(sheet, bookingDate) {
@@ -173,7 +328,7 @@ function updateBookingStatus(bookingReference, newStatus) {
     if (references[index][0] === reference) {
       sheet.getRange(index + 2, 14).setValue(status);
       safeLog_("STATUS_UPDATED", reference);
-      return true;
+      return { bookingReference: reference, status: status };
     }
   }
   throw new Error("NOT_FOUND: booking reference not found");

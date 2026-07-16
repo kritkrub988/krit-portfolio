@@ -9,6 +9,15 @@ export type Project = {
 
 export const projects: Project[] = [
   {
+    title: "KRIT HUB AI Tutor",
+    description: "ระบบดูหลักสูตร ราคา และจองคิวเรียนคอมพิวเตอร์และ AI",
+    image: "/images/projects/krit-ai-hub.webp",
+    technologies: ["Next.js", "Google Apps Script", "Google Sheets"],
+    overview:
+      "ระบบสำหรับดูข้อมูลหลักสูตร ตรวจรอบว่าง และส่งคำขอจองเรียน พร้อมหน้าจัดการรายการสำหรับผู้ดูแล",
+    href: "/tutor",
+  },
+  {
     title: "KRIT AI HUB",
     description: "AI Agent Platform",
     image: "/images/projects/krit-ai-hub.webp",

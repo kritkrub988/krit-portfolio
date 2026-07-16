@@ -213,6 +213,7 @@ function styleBookingsSheet_(sheet) {
   sheet.getRange("A:A").setNumberFormat("@");
   sheet.getRange("B:D").setNumberFormat("@");
   sheet.getRange("F:F").setNumberFormat("@");
+  sheet.getRange("G:I").setNumberFormat("0");
   sheet.getRange("O:O").setNumberFormat("@");
   var statusRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(["pending", "confirmed", "cancelled"], true)

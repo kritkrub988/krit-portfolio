@@ -1,41 +1,46 @@
-# Data Dictionary — KRIT HUB AI Tutor Bookings
+# Data Dictionary — KRIT HUB AI Tutor
 
-เอกสารนี้อธิบายคอลัมน์ A–O ของ Sheet `Bookings` ตามลำดับจริง ข้อมูลทั้งหมดเป็นข้อมูลการจอง จึงต้องจำกัดสิทธิ์เข้าถึง Google Sheets และไม่คัดลอกข้อมูลส่วนบุคคลไปยัง Log หรือระบบอื่นโดยไม่จำเป็น
+## Bookings (A–O)
 
-| คอลัมน์ / Field | ความหมาย | ชนิด | Required | ตัวอย่าง (สมมติ) | Validation | Source of Truth | ข้อควรระวัง |
-|---|---|---|---|---|---|---|---|
-| A `booking_reference` | เลขอ้างอิงรายการจอง | String | Required | `KHA-20260720-A1B2C3` | `KHA-YYYYMMDD-XXXXXX`, ต้องไม่ซ้ำ | Apps Script ภายใต้ Lock | ห้ามแก้เองหลังสร้าง; ใช้อ้างอิงโดยไม่ต้องเปิดเผยเบอร์โทร |
-| B `created_at` | เวลาที่ระบบรับการจอง | String datetime | Required | `2026-07-20 08:15:30` | `YYYY-MM-DD HH:mm:ss`, Asia/Bangkok | Apps Script clock | ไม่ใช่เวลาเรียน; เก็บเป็นข้อความเพื่อไม่ให้ Locale เปลี่ยนรูป |
-| C `booking_date` | วันที่เรียน | String date | Required | `2026-07-20` | วันที่จริง `YYYY-MM-DD`, ไม่ย้อนหลัง | ผู้จอง + Apps Script Validation | ห้ามใช้รูปแบบ `DD/MM/YYYY`; มีผลต่อ Slot ซ้ำ |
-| D `time_slot` | รอบเวลาเรียน | String enum | Required | `09:00-10:30` | ต้องอยู่ใน weekday/weekend slots ของวันนั้น | Settings + Apps Script | วันธรรมดาไม่มี `15:00-16:30` |
-| E `customer_name` | ชื่อผู้ติดต่อจอง | String | Required | `ผู้จองทดสอบ` | Trim, ห้ามว่าง, Next.js จำกัด 150 ตัวอักษร | ผู้จอง | เป็น PII; ห้าม Log หรือใช้ตัวอย่างชื่อบุคคลจริง |
-| F `phone` | เบอร์โทรผู้ติดต่อ | String | Required | `0800000000` | Trim, ห้ามว่าง, Next.js จำกัด 50 ตัวอักษร | ผู้จอง | เก็บเป็นข้อความเพื่อรักษาเลข 0; เป็น PII |
-| G `number_of_students` | จำนวนผู้เรียนในรอบ | Integer | Required | `2` | จำนวนเต็ม 1–4 | ผู้จอง + Server Validation | ห้ามรับค่าทศนิยมหรือค่าที่ Client แปลงผิดชนิด |
-| H `price_per_person` | ราคาต่อคน ณ เวลาจอง | Number | Required | `250` | คำนวณจากราคารวม/จำนวนคน | Apps Script Settings | ห้ามเชื่อค่าจาก Client; เก็บค่าเดิมเพื่อ Audit แม้เปลี่ยนราคาใหม่ |
-| I `total_price` | ราคารวมของรายการ | Number | Required | `500` | Mapping 1–4 คนจาก Settings | Apps Script Settings | ไม่ใช่หลักฐานการชำระเงิน; ระบบไม่เก็บข้อมูลบัตร |
-| J `course_name` | ชื่อหลักสูตรที่จอง | String | Required | `Level 2 + 2.5 Extra` | ต้องไม่ว่าง; ใช้ Default เมื่อ Settings ผิด | Apps Script Settings/Config | Client เปลี่ยนเองไม่ได้; เก็บ Snapshot ของรายการ |
-| K `learning_format` | รูปแบบการเรียน | String enum | Required | `onsite` | `onsite` หรือ `online` เท่านั้น | ผู้จอง + Server Validation | ตัวพิมพ์เล็กตามค่ามาตรฐาน |
-| L `location` | สถานที่หรือรายละเอียดการเรียน | String | Required ใน Payload ปัจจุบัน (อนุญาตข้อความว่าง) | `ในเมืองพิษณุโลก` | String, Trim, Next.js จำกัด 500 ตัวอักษร | ผู้จอง | อาจมีข้อมูลส่วนบุคคล; อย่าใส่รายละเอียดเกินจำเป็น |
-| M `note` | หมายเหตุเพิ่มเติม | String | Optional | `ต้องการเน้นหัวข้อ AI` | Trim, Next.js จำกัด 2,000 ตัวอักษร | ผู้จอง | ข้อความอิสระเสี่ยงมี PII; ห้ามใช้เก็บข้อมูลชำระเงิน |
-| N `status` | สถานะดำเนินการ | String enum | Required | `pending` | `pending`, `confirmed`, `cancelled`; เริ่ม `pending` | Apps Script ตอนสร้าง + ผู้ดูแลภายหลัง | pending/confirmed ล็อก Slot; cancelled ไม่ล็อก |
-| O `line_user_id` | รหัส LINE สำหรับเชื่อมในอนาคต | String | Optional | ว่าง | Trim, Next.js จำกัด 200 ตัวอักษร | Client ที่ได้รับอนุญาตในอนาคต | รอบนี้ยังไม่เชื่อม LINE OA; เป็น Identifier ที่ต้องปกป้อง |
+| Col | Field | Type/format | ที่มา/กติกา |
+| --- | --- | --- | --- |
+| A | `booking_reference` | text | Server สร้าง `KHA-YYYYMMDD-XXXXXX`, unique |
+| B | `created_at` | ISO text | Apps Script, Asia/Bangkok context |
+| C | `booking_date` | `YYYY-MM-DD` text | วันนี้หรืออนาคต Bangkok |
+| D | `time_slot` | `HH:mm-HH:mm` text | ต้องอยู่ใน Settings ตามวัน |
+| E | `customer_name` | text 2–100 | ผู้จอง |
+| F | `phone` | text 8–20 | เก็บเป็น text เพื่อรักษาเลข 0 |
+| G | `number_of_students` | integer 1–4 | JSON number เท่านั้น |
+| H | `price_per_person` | integer THB | Server คำนวณจาก Settings |
+| I | `total_price` | integer THB | Server คำนวณจาก Settings |
+| J | `course_name` | text | Settings |
+| K | `learning_format` | enum | `onsite` หรือ `online` |
+| L | `location` | text 0–200 | onsite ต้องมี; online ว่างได้ |
+| M | `note` | text 0–500 | optional |
+| N | `status` | enum | `pending`, `confirmed`, `cancelled` |
+| O | `line_user_id` | text 0–100 | optional สำหรับอนาคต |
 
-## Mapping ราคาเริ่มต้น
+`pending` และ `confirmed` ปิด slot; `cancelled` ไม่ปิด slot
 
-| จำนวนผู้เรียน | ราคาต่อคน | ราคารวม |
-|---:|---:|---:|
-| 1 | 300 | 300 |
-| 2 | 250 | 500 |
-| 3 | 220 | 660 |
-| 4 | 220 | 880 |
+## Settings
 
-Apps Script คำนวณราคาใหม่ทุกคำขอและไม่อ่าน `price_per_person`, `total_price`, `course_name` หรือ `status` จาก Client ค่าฝั่ง Next.js ใช้ Preview/Validation Test ไม่ใช่ Source of Truth สำหรับการบันทึก
+| key | default | กติกา |
+| --- | --- | --- |
+| `course_name` | Level 2 + 2.5 Extra | non-empty |
+| `class_duration_minutes` | 90 | positive integer |
+| `break_minutes` | 30 | positive integer |
+| `weekday_slots` | 09:00…19:00 | comma-separated slots |
+| `weekend_slots` | 09:00…19:00 | รวม 15:00–16:30 |
+| `price_1_person` | 300 | ราคารวม/หาร 1 ลงตัว |
+| `price_2_people` | 500 | ราคารวม/หาร 2 ลงตัว |
+| `price_3_people` | 660 | ราคารวม/หาร 3 ลงตัว |
+| `price_4_people` | 880 | ราคารวม/หาร 4 ลงตัว |
+| `timezone` | Asia/Bangkok | รองรับค่านี้เท่านั้น |
 
-## กติกาความเป็นส่วนตัวและการแก้ข้อมูล
+## API-only fields
 
-- จำกัดสิทธิ์ Sheet เฉพาะผู้ดูแลที่จำเป็น
-- ใช้ `booking_reference` ในการสื่อสารภายในแทนการคัดลอกชื่อ/เบอร์เมื่อทำได้
-- ห้ามเก็บเลขบัตร, CVV, Slip หรือ Credential ในคอลัมน์ใด
-- การแก้ status ใช้ค่าที่กำหนดเท่านั้น
-- หากต้องแก้วันหรือ Slot ให้ยกเลิกรายการเดิมและสร้างใหม่เพื่อรักษาประวัติที่ชัดเจน
-- กำหนดระยะเวลาเก็บข้อมูลและขั้นตอนลบข้อมูลตามนโยบายความเป็นส่วนตัวของผู้ดูแลก่อนใช้งานจริง
+`consent`, `website` (honeypot), `form_started_at` และ `submission_id` ใช้ตรวจคำขอใน Next.js และไม่บันทึกลง Sheets; `api_secret` ส่ง server-to-server เท่านั้น
+
+## PII และ retention
+
+ชื่อ/โทรศัพท์/location/note/LINE id เป็นข้อมูลส่วนบุคคล ให้จำกัดสิทธิ์, ไม่ใส่ log/screenshot, กำหนดระยะเก็บและวิธีลบตามนโยบายเจ้าของระบบ การยกเลิกควรเปลี่ยนสถานะแทนลบแถวเพื่อ audit ก่อนถึงกำหนด retention

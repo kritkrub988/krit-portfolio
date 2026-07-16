@@ -49,6 +49,14 @@ export function getAllowedTimeSlots(bookingDate: string): readonly TimeSlot[] {
   return dayOfWeek === 0 || dayOfWeek === 6 ? WEEKEND_TIME_SLOTS : WEEKDAY_TIME_SLOTS
 }
 
+export const bookingDateSchema = z
+  .string()
+  .trim()
+  .refine(isRealIsoDate, "วันที่ต้องเป็นวันที่จริงในรูปแบบ YYYY-MM-DD")
+  .refine((value) => !isRealIsoDate(value) || value >= getBangkokDateString(), {
+    message: "ไม่สามารถเลือกวันที่ย้อนหลังได้",
+  })
+
 const studentCountSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
 
 export const bookingRequestSchema: z.ZodType<BookingRequest> = z
@@ -96,16 +104,41 @@ export const bookingRequestSchema: z.ZodType<BookingRequest> = z
     }
   })
 
-export const bookingFormSchema = bookingRequestSchema.and(
-  z
-    .object({
-      consent: z.literal(true, { error: "กรุณายอมรับการใช้ข้อมูลเพื่อจัดการการจอง" }),
-      website: z.string().max(0, "ตรวจพบข้อมูลที่ไม่ควรมี"),
-      form_started_at: z.number().int().positive(),
-      submission_id: z.string().uuid(),
+export const bookingFormSchema = z
+  .object({
+    customer_name: z.string().trim().min(1).max(150),
+    phone: z.string().trim().min(1).max(50),
+    booking_date: z.string().trim(),
+    time_slot: z.enum(ALL_TIME_SLOTS),
+    number_of_students: studentCountSchema,
+    learning_format: z.enum(["onsite", "online"]),
+    location: z.string().trim().max(500),
+    note: z.string().trim().max(2_000).optional().default(""),
+    line_user_id: z.string().trim().max(200).optional().default(""),
+    consent: z.literal(true, { error: "กรุณายอมรับการใช้ข้อมูลเพื่อจัดการการจอง" }),
+    website: z.string().max(0, "ตรวจพบข้อมูลที่ไม่ควรมี"),
+    form_started_at: z.number().int().positive(),
+    submission_id: z.string().uuid(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const coreResult = bookingRequestSchema.safeParse({
+      customer_name: value.customer_name,
+      phone: value.phone,
+      booking_date: value.booking_date,
+      time_slot: value.time_slot,
+      number_of_students: value.number_of_students,
+      learning_format: value.learning_format,
+      location: value.location,
+      note: value.note,
+      line_user_id: value.line_user_id,
     })
-    .strict(),
-)
+    if (!coreResult.success) {
+      for (const issue of coreResult.error.issues) {
+        context.addIssue({ code: "custom", path: issue.path, message: issue.message })
+      }
+    }
+  })
 
 export function validateFormTiming(startedAt: number, now = Date.now()): boolean {
   const elapsed = now - startedAt
