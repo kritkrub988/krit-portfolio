@@ -134,7 +134,18 @@ function handleVerifyEmailOtp_(rawEmail, rawRequestId, rawOtp) {
     record.used = true;
     cache.put(key, JSON.stringify(record), 60);
     var verificationToken = Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, "");
-    cache.put("email_verified_" + verificationToken, JSON.stringify({ email: email, used: false, expires_at: Date.now() + EMAIL_OTP_CONFIG.otpTtlSeconds * 1000 }), EMAIL_OTP_CONFIG.otpTtlSeconds);
+    var verificationRecord = {
+      email: email,
+      used: false,
+      expires_at: Date.now() + EMAIL_OTP_CONFIG.otpTtlSeconds * 1000,
+    };
+    var verificationJson = JSON.stringify(verificationRecord);
+    cache.put("email_verified_" + verificationToken, verificationJson, EMAIL_OTP_CONFIG.otpTtlSeconds);
+    cleanupExpiredEmailVerificationTokens_();
+    PropertiesService.getScriptProperties().setProperty(
+      emailVerificationPropertyKey_(verificationToken),
+      verificationJson,
+    );
     return jsonResponse_({ success: true, message: "ยืนยันอีเมลสำเร็จ", verification_token: verificationToken, expires_in_seconds: EMAIL_OTP_CONFIG.otpTtlSeconds });
   } finally {
     lock.releaseLock();
@@ -143,20 +154,56 @@ function handleVerifyEmailOtp_(rawEmail, rawRequestId, rawOtp) {
 
 function validateEmailVerification_(email, token) {
   var normalizedEmail = normalizeEmail_(email);
-  var value = parseCacheJson_(CacheService.getScriptCache().get("email_verified_" + String(token || "").trim()));
+  var normalizedToken = String(token || "").trim();
+  var cache = CacheService.getScriptCache();
+  var value = parseCacheJson_(cache.get("email_verified_" + normalizedToken));
+  if (!value) {
+    value = parseCacheJson_(
+      PropertiesService.getScriptProperties().getProperty(
+        emailVerificationPropertyKey_(normalizedToken),
+      ),
+    );
+  }
   if (!value || value.used || value.email !== normalizedEmail || Date.now() >= Number(value.expires_at || 0)) {
     return { valid: false, code: "EMAIL_NOT_VERIFIED", message: "กรุณายืนยันอีเมลก่อนจอง" };
   }
+  cache.put(
+    "email_verified_" + normalizedToken,
+    JSON.stringify(value),
+    Math.max(1, Math.ceil((Number(value.expires_at) - Date.now()) / 1000)),
+  );
   return { valid: true };
 }
 
 function markEmailVerificationUsed_(token) {
-  var key = "email_verified_" + String(token || "").trim();
+  var normalizedToken = String(token || "").trim();
+  var key = "email_verified_" + normalizedToken;
   var cache = CacheService.getScriptCache();
-  var value = parseCacheJson_(cache.get(key));
-  if (!value) return;
-  value.used = true;
-  cache.put(key, JSON.stringify(value), 60);
+  var properties = PropertiesService.getScriptProperties();
+  var propertyKey = emailVerificationPropertyKey_(normalizedToken);
+  var value = parseCacheJson_(cache.get(key)) || parseCacheJson_(properties.getProperty(propertyKey));
+  properties.deleteProperty(propertyKey);
+  if (value) {
+    value.used = true;
+    cache.put(key, JSON.stringify(value), 60);
+  } else {
+    cache.remove(key);
+  }
+}
+
+function emailVerificationPropertyKey_(token) {
+  return "EMAIL_VERIFICATION_" + String(token || "").trim();
+}
+
+function cleanupExpiredEmailVerificationTokens_() {
+  var properties = PropertiesService.getScriptProperties();
+  var allProperties = properties.getProperties();
+  var now = Date.now();
+  Object.keys(allProperties).forEach(function (key) {
+    if (key.indexOf("EMAIL_VERIFICATION_") !== 0) return;
+    var value = parseCacheJson_(allProperties[key]);
+    if (!value || now >= Number(value.expires_at || 0)) properties.deleteProperty(key);
+  });
 }
 
 function invalidateOtpRecord_(cache, key) {
