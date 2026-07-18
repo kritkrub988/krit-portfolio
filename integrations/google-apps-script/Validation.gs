@@ -25,6 +25,8 @@ function validateBookingRequest_(payload, settings) {
 
   var customerName = String(data.customer_name || "").trim();
   var phone = String(data.phone || "").trim();
+  var email = normalizeEmail_(data.email);
+  var emailVerificationToken = String(data.email_verification_token || "").trim();
   var bookingDate = String(data.booking_date || "").trim();
   var timeSlot = String(data.time_slot || "").trim();
   var learningFormat = String(data.learning_format || "").trim().toLowerCase();
@@ -40,6 +42,9 @@ function validateBookingRequest_(payload, settings) {
   if (customerName.length > 150) errors.push("customer_name ยาวเกิน 150 ตัวอักษร");
   if (!phone) errors.push("phone ต้องไม่ว่าง");
   if (phone.length > 50) errors.push("phone ยาวเกิน 50 ตัวอักษร");
+  if (!isValidEmail_(email)) errors.push("email ต้องเป็นอีเมลที่ถูกต้อง");
+  if (!emailVerificationToken) errors.push("ต้องยืนยันอีเมลก่อนจอง");
+  else if (emailVerificationToken.length > 200) errors.push("โทเค็นยืนยันอีเมลไม่ถูกต้อง");
   if (!parsedDate) errors.push("booking_date ต้องเป็นวันที่จริงในรูปแบบ YYYY-MM-DD");
   if (parsedDate) {
     var today = Utilities.formatDate(new Date(), settings.timezone, "yyyy-MM-dd");
@@ -67,6 +72,8 @@ function validateBookingRequest_(payload, settings) {
     value: {
       customerName: customerName,
       phone: phone,
+      email: email,
+      emailVerificationToken: emailVerificationToken,
       bookingDate: bookingDate,
       timeSlot: timeSlot,
       numberOfStudents: numberOfStudents,

@@ -22,6 +22,9 @@ import {
   parseAdminUpdateResponse,
   parseAppsScriptResponse,
   parseAvailabilityResponse,
+  parseEmailOtpResponse,
+  parseEmailOtpVerifyResponse,
+  normalizeEmail,
   validateFormTiming,
 } from "../src/lib/tutor-booking/validation.ts"
 
@@ -38,6 +41,8 @@ function validRequest(overrides: Record<string, unknown> = {}) {
   return {
     customer_name: "ผู้จองทดสอบ",
     phone: "0999999999",
+    email: "test@example.com",
+    email_verification_token: "verification-token-1234567890",
     booking_date: nextDateWithDay(1),
     time_slot: "09:00-10:30",
     number_of_students: 1,
@@ -91,6 +96,10 @@ test("unknown slot is rejected", () => assert.equal(bookingRequestSchema.safePar
 test("valid booking passes", () => assert.equal(bookingRequestSchema.safeParse(validRequest()).success, true))
 test("missing name is rejected", () => assert.equal(bookingRequestSchema.safeParse(validRequest({ customer_name: "" })).success, false))
 test("missing phone is rejected", () => assert.equal(bookingRequestSchema.safeParse(validRequest({ phone: "" })).success, false))
+test("missing email is rejected", () => assert.equal(bookingRequestSchema.safeParse(validRequest({ email: "" })).success, false))
+test("invalid email is rejected", () => assert.equal(bookingRequestSchema.safeParse(validRequest({ email: "not-an-email" })).success, false))
+test("verification token is required", () => assert.equal(bookingRequestSchema.safeParse(validRequest({ email_verification_token: "" })).success, false))
+test("email normalization trims and lowercases", () => assert.equal(normalizeEmail("  User@Example.COM "), "user@example.com"))
 test("invalid student count is rejected", () => assert.equal(bookingRequestSchema.safeParse(validRequest({ number_of_students: 5 })).success, false))
 test("invalid learning format is rejected", () => assert.equal(bookingRequestSchema.safeParse(validRequest({ learning_format: "hybrid" })).success, false))
 test("onsite requires location", () => assert.equal(bookingRequestSchema.safeParse(validRequest({ location: "" })).success, false))
@@ -112,6 +121,36 @@ test("rate limiter allows within limit and blocks overflow", () => {
   assert.equal(checkRateLimit(key, 2, 10_000, 1_000).allowed, true)
   assert.equal(checkRateLimit(key, 2, 10_000, 1_001).allowed, true)
   assert.equal(checkRateLimit(key, 2, 10_000, 1_002).allowed, false)
+})
+
+test("email OTP send success response parses", () => {
+  assert.equal(parseEmailOtpResponse({
+    success: true,
+    message: "ส่งรหัสแล้ว",
+    request_id: "1234567890123456",
+    expires_in_seconds: 600,
+    resend_after_seconds: 60,
+  })?.success, true)
+})
+
+test("email OTP verify success response parses", () => {
+  assert.equal(parseEmailOtpVerifyResponse({
+    success: true,
+    message: "ยืนยันแล้ว",
+    verification_token: "1234567890123456",
+    expires_in_seconds: 600,
+  })?.success, true)
+})
+
+test("email OTP response rejects leaked OTP", () => {
+  assert.equal(parseEmailOtpResponse({
+    success: true,
+    message: "ส่งรหัสแล้ว",
+    request_id: "1234567890123456",
+    expires_in_seconds: 600,
+    resend_after_seconds: 60,
+    otp: "123456",
+  }), null)
 })
 
 const successResponse = {

@@ -28,6 +28,12 @@ function doPost(event) {
     var action = String(payload.action || "createBooking");
     delete payload.action;
 
+    if (action === "sendEmailOtp") {
+      return handleSendEmailOtp_(payload.email);
+    }
+    if (action === "verifyEmailOtp") {
+      return handleVerifyEmailOtp_(payload.email, payload.request_id, payload.otp);
+    }
     if (action === "availability") {
       return handleAvailability_(payload.booking_date);
     }
@@ -75,6 +81,10 @@ function doPost(event) {
     }
 
     var booking = validation.value;
+    var emailVerification = validateEmailVerification_(booking.email, booking.emailVerificationToken);
+    if (!emailVerification.valid) {
+      return errorResponse_(emailVerification.code, emailVerification.message);
+    }
     if (isSlotUnavailable_(bookings, booking.bookingDate, booking.timeSlot)) {
       return errorResponse_("SLOT_UNAVAILABLE", "รอบเวลานี้ถูกจองแล้ว กรุณาเลือกรอบเวลาอื่น");
     }
@@ -87,6 +97,7 @@ function doPost(event) {
     bookings.getRange(nextRow, 1, 1, 4).setNumberFormat("@");
     bookings.getRange(nextRow, 6).setNumberFormat("@");
     bookings.getRange(nextRow, 15).setNumberFormat("@");
+    bookings.getRange(nextRow, 16).setNumberFormat("@");
     bookings.getRange(nextRow, 1, 1, BOOKING_CONFIG.bookingHeaders.length).setValues([[
       bookingReference,
       createdAt,
@@ -103,7 +114,10 @@ function doPost(event) {
       booking.note,
       "pending",
       booking.lineUserId,
+      booking.email,
     ]]);
+
+    markEmailVerificationUsed_(booking.emailVerificationToken);
 
     safeLog_("BOOKING_CREATED", bookingReference);
     lock.releaseLock();
@@ -268,7 +282,7 @@ function handleListBookings_(requestedLimit) {
 
   var rowCount = Math.min(limit, sheet.getLastRow() - 1);
   var startRow = sheet.getLastRow() - rowCount + 1;
-  var rows = sheet.getRange(startRow, 1, rowCount, 15).getDisplayValues().reverse();
+  var rows = sheet.getRange(startRow, 1, rowCount, 16).getDisplayValues().reverse();
   var bookings = rows.map(function (row) {
     return {
       booking_reference: row[0],
@@ -286,6 +300,7 @@ function handleListBookings_(requestedLimit) {
       note: row[12],
       status: row[13],
       line_user_id: row[14],
+      email: row[15],
     };
   });
   return jsonResponse_({ success: true, bookings: bookings });

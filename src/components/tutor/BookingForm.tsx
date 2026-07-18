@@ -11,7 +11,7 @@ import type {
   LearningFormat,
   TimeSlot,
 } from "@/lib/tutor-booking/types.ts"
-import { getBangkokDateString } from "@/lib/tutor-booking/validation.ts"
+import { emailSchema, getBangkokDateString, normalizeEmail } from "@/lib/tutor-booking/validation.ts"
 
 const fieldClass =
   "mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
@@ -20,6 +20,12 @@ export default function BookingForm() {
   const router = useRouter()
   const [customerName, setCustomerName] = useState("")
   const [phone, setPhone] = useState("")
+  const [email, setEmail] = useState("")
+  const [emailRequestId, setEmailRequestId] = useState("")
+  const [emailOtp, setEmailOtp] = useState("")
+  const [emailVerificationToken, setEmailVerificationToken] = useState("")
+  const [resendAvailableAt, setResendAvailableAt] = useState(0)
+  const [countdownNow, setCountdownNow] = useState(() => Date.now())
   const [bookingDate, setBookingDate] = useState("")
   const [timeSlot, setTimeSlot] = useState<TimeSlot | "">("")
   const [studentCount, setStudentCount] = useState<1 | 2 | 3 | 4>(1)
@@ -33,6 +39,8 @@ export default function BookingForm() {
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null)
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSendingOtp, setIsSendingOtp] = useState(false)
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
   const [message, setMessage] = useState("")
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -77,6 +85,85 @@ export default function BookingForm() {
     }
   }, [bookingDate, refreshKey])
 
+  useEffect(() => {
+    if (!resendAvailableAt) return
+    const timer = window.setInterval(() => setCountdownNow(Date.now()), 1_000)
+    return () => window.clearInterval(timer)
+  }, [resendAvailableAt])
+
+  function handleEmailChange(value: string) {
+    setEmail(value)
+    setEmailRequestId("")
+    setEmailOtp("")
+    setEmailVerificationToken("")
+    setResendAvailableAt(0)
+  }
+
+  async function handleSendEmailOtp() {
+    const normalizedEmail = normalizeEmail(email)
+    const validation = emailSchema.safeParse(normalizedEmail)
+    if (!validation.success) {
+      setMessage("กรุณากรอกอีเมลให้ถูกต้อง")
+      return
+    }
+    if (resendAvailableAt > Date.now()) {
+      setMessage(`กรุณารอ ${Math.ceil((resendAvailableAt - Date.now()) / 1_000)} วินาทีก่อนส่งรหัสอีกครั้ง`)
+      return
+    }
+    setIsSendingOtp(true)
+    setMessage("")
+    try {
+      const response = await fetch("/api/tutor/email-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "send", email: normalizedEmail }),
+      })
+      const result = await response.json() as { success: boolean; message: string; request_id?: string; resend_after_seconds?: number }
+      if (!result.success || !result.request_id) {
+        setMessage(result.message || "ไม่สามารถส่งอีเมลได้ในขณะนี้ กรุณาลองใหม่ภายหลัง")
+        return
+      }
+      setEmail(normalizedEmail)
+      setEmailRequestId(result.request_id)
+      setEmailOtp("")
+      setEmailVerificationToken("")
+      setResendAvailableAt(Date.now() + (result.resend_after_seconds || 60) * 1_000)
+      setCountdownNow(Date.now())
+      setMessage(`ส่งรหัสยืนยันไปยัง ${normalizedEmail} แล้ว รหัสมีอายุ 10 นาที`)
+    } catch {
+      setMessage("ไม่สามารถส่งอีเมลได้ในขณะนี้ กรุณาลองใหม่ภายหลัง")
+    } finally {
+      setIsSendingOtp(false)
+    }
+  }
+
+  async function handleVerifyEmailOtp() {
+    if (!emailRequestId || !/^[0-9]{6}$/.test(emailOtp)) {
+      setMessage("กรุณากรอกรหัสยืนยัน 6 หลัก")
+      return
+    }
+    setIsVerifyingOtp(true)
+    setMessage("")
+    try {
+      const response = await fetch("/api/tutor/email-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "verify", email: normalizeEmail(email), request_id: emailRequestId, otp: emailOtp }),
+      })
+      const result = await response.json() as { success: boolean; message: string; verification_token?: string }
+      if (!result.success || !result.verification_token) {
+        setMessage(result.message || "รหัสยืนยันไม่ถูกต้อง")
+        return
+      }
+      setEmailVerificationToken(result.verification_token)
+      setMessage("ยืนยันอีเมลสำเร็จ")
+    } catch {
+      setMessage("ไม่สามารถยืนยันรหัสได้ กรุณาลองใหม่")
+    } finally {
+      setIsVerifyingOtp(false)
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (isSubmitting || !timeSlot || !submissionId) return
@@ -90,6 +177,8 @@ export default function BookingForm() {
         body: JSON.stringify({
           customer_name: customerName,
           phone,
+          email: normalizeEmail(email),
+          email_verification_token: emailVerificationToken,
           booking_date: bookingDate,
           time_slot: timeSlot,
           number_of_students: studentCount,
@@ -146,6 +235,30 @@ export default function BookingForm() {
           เบอร์โทรศัพท์ <span className="text-red-600">*</span>
           <input value={phone} onChange={(event) => setPhone(event.target.value)} className={fieldClass} maxLength={50} inputMode="tel" autoComplete="tel" required />
         </label>
+        <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <label className="block text-sm font-bold text-slate-800">
+            อีเมลผู้จอง <span className="text-red-600">*</span>
+            <input type="email" value={email} onChange={(event) => handleEmailChange(event.target.value)} className={fieldClass} maxLength={254} placeholder="example@email.com" autoComplete="email" required />
+          </label>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button type="button" onClick={() => void handleSendEmailOtp()} disabled={isSendingOtp || !email.trim() || resendAvailableAt > countdownNow} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-blue-300 bg-white px-4 py-3 text-sm font-bold text-blue-700 transition hover:border-blue-500 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50">
+              {isSendingOtp ? "กำลังส่งรหัส…" : emailRequestId ? "ส่งรหัสอีกครั้ง" : "ส่งรหัสยืนยัน"}
+            </button>
+            {emailRequestId && !emailVerificationToken && <p className="text-xs leading-6 text-slate-600">OTP มีอายุ 10 นาที{resendAvailableAt > countdownNow ? ` · ส่งซ้ำได้ใน ${Math.ceil((resendAvailableAt - countdownNow) / 1_000)} วินาที` : ""}</p>}
+            {emailVerificationToken && <p className="text-sm font-bold text-emerald-700" role="status">ยืนยันอีเมลสำเร็จ</p>}
+          </div>
+          {emailRequestId && !emailVerificationToken && (
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+              <label className="block flex-1 text-sm font-bold text-slate-800">
+                รหัส OTP 6 หลัก
+                <input value={emailOtp} onChange={(event) => setEmailOtp(event.target.value.replace(/\D/g, "").slice(0, 6))} className={`${fieldClass} tracking-[0.35em]`} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" />
+              </label>
+              <button type="button" onClick={() => void handleVerifyEmailOtp()} disabled={isVerifyingOtp || emailOtp.length !== 6} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50">
+                {isVerifyingOtp ? "กำลังตรวจสอบ…" : "ยืนยันรหัส"}
+              </button>
+            </div>
+          )}
+        </div>
         <label className="text-sm font-bold text-slate-800">
           วันที่เรียน <span className="text-red-600">*</span>
           <input type="date" value={bookingDate} min={minimumDate} onChange={(event) => { setBookingDate(event.target.value); setAvailability(null); setTimeSlot("") }} className={fieldClass} required />
@@ -224,7 +337,7 @@ export default function BookingForm() {
 
       {message && <p id="booking-form-message" role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">{message}</p>}
 
-      <button type="submit" disabled={isSubmitting || isLoadingSlots || !timeSlot || !consent || !submissionId} className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-3 font-bold text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
+      <button type="submit" disabled={isSubmitting || isLoadingSlots || !timeSlot || !consent || !submissionId || !emailVerificationToken} className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-3 font-bold text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
         {isSubmitting ? "กำลังส่งคำขอ…" : "ยืนยันการจองคิว"}
       </button>
     </form>

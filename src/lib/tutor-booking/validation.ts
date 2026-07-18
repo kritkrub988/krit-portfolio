@@ -12,6 +12,8 @@ import type {
   AvailabilityResponse,
   BookingRequest,
   BookingResponse,
+  EmailOtpResponse,
+  EmailOtpVerifyResponse,
   TimeSlot,
 } from "./types.ts"
 
@@ -59,10 +61,18 @@ export const bookingDateSchema = z
 
 const studentCountSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
 
+export const emailSchema = z.string().trim().email("กรุณากรอกอีเมลให้ถูกต้อง").max(254)
+
+export function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase()
+}
+
 export const bookingRequestSchema: z.ZodType<BookingRequest> = z
   .object({
     customer_name: z.string().trim().min(1, "customer_name ต้องไม่ว่าง").max(150),
     phone: z.string().trim().min(1, "phone ต้องไม่ว่าง").max(50),
+    email: emailSchema,
+    email_verification_token: z.string().trim().min(1, "ต้องยืนยันอีเมลก่อนจอง"),
     booking_date: z
       .string()
       .trim()
@@ -108,6 +118,8 @@ export const bookingFormSchema = z
   .object({
     customer_name: z.string().trim().min(1).max(150),
     phone: z.string().trim().min(1).max(50),
+    email: emailSchema,
+    email_verification_token: z.string().trim().min(1),
     booking_date: z.string().trim(),
     time_slot: z.enum(ALL_TIME_SLOTS),
     number_of_students: studentCountSchema,
@@ -125,6 +137,8 @@ export const bookingFormSchema = z
     const coreResult = bookingRequestSchema.safeParse({
       customer_name: value.customer_name,
       phone: value.phone,
+      email: value.email,
+      email_verification_token: value.email_verification_token,
       booking_date: value.booking_date,
       time_slot: value.time_slot,
       number_of_students: value.number_of_students,
@@ -149,6 +163,8 @@ export function toBookingRequest(value: z.infer<typeof bookingFormSchema>): Book
   return {
     customer_name: value.customer_name,
     phone: value.phone,
+    email: normalizeEmail(value.email),
+    email_verification_token: value.email_verification_token,
     booking_date: value.booking_date,
     time_slot: value.time_slot,
     number_of_students: value.number_of_students,
@@ -200,6 +216,41 @@ export function parseAppsScriptResponse(value: unknown): BookingResponse | null 
   return result.success ? result.data : null
 }
 
+const emailOtpSendResponseSchema: z.ZodType<EmailOtpResponse> = z.discriminatedUnion("success", [
+  z
+    .object({
+      success: z.literal(true),
+      message: z.string().min(1),
+      request_id: z.string().min(16),
+      expires_in_seconds: z.number().int().positive(),
+      resend_after_seconds: z.number().int().nonnegative(),
+    })
+    .strict(),
+  bookingErrorResponseSchema,
+])
+
+const emailOtpVerifyResponseSchema: z.ZodType<EmailOtpVerifyResponse> = z.discriminatedUnion("success", [
+  z
+    .object({
+      success: z.literal(true),
+      message: z.string().min(1),
+      verification_token: z.string().min(16),
+      expires_in_seconds: z.number().int().positive(),
+    })
+    .strict(),
+  bookingErrorResponseSchema,
+])
+
+export function parseEmailOtpResponse(value: unknown): EmailOtpResponse | null {
+  const result = emailOtpSendResponseSchema.safeParse(value)
+  return result.success ? result.data : null
+}
+
+export function parseEmailOtpVerifyResponse(value: unknown): EmailOtpVerifyResponse | null {
+  const result = emailOtpVerifyResponseSchema.safeParse(value)
+  return result.success ? result.data : null
+}
+
 const availabilityResponseSchema: z.ZodType<AvailabilityResponse> = z.discriminatedUnion(
   "success",
   [
@@ -224,6 +275,7 @@ const adminBookingSchema = z
     time_slot: z.enum(ALL_TIME_SLOTS),
     customer_name: z.string(),
     phone: z.string(),
+    email: z.string(),
     number_of_students: studentCountSchema,
     price_per_person: z.number().nonnegative(),
     total_price: z.number().nonnegative(),

@@ -7,6 +7,8 @@ export type TimeSlot = (typeof ALL_TIME_SLOTS)[number]
 export interface BookingRequest {
   customer_name: string
   phone: string
+  email: string
+  email_verification_token: string
   booking_date: string
   time_slot: TimeSlot
   number_of_students: 1 | 2 | 3 | 4
@@ -43,6 +45,25 @@ export interface BookingErrorResponse {
 
 export type BookingResponse = BookingSuccessResponse | BookingErrorResponse
 
+export interface EmailOtpSendSuccessResponse {
+  success: true
+  message: string
+  request_id: string
+  expires_in_seconds: number
+  resend_after_seconds: number
+}
+
+export type EmailOtpResponse = EmailOtpSendSuccessResponse | BookingErrorResponse
+
+export interface EmailOtpVerifySuccessResponse {
+  success: true
+  message: string
+  verification_token: string
+  expires_in_seconds: number
+}
+
+export type EmailOtpVerifyResponse = EmailOtpVerifySuccessResponse | BookingErrorResponse
+
 export interface AvailabilitySuccessResponse {
   success: true
   date: string
@@ -60,6 +81,7 @@ export interface AdminBooking {
   time_slot: TimeSlot
   customer_name: string
   phone: string
+  email: string
   number_of_students: 1 | 2 | 3 | 4
   price_per_person: number
   total_price: number

@@ -72,6 +72,8 @@ export async function POST(request: Request): Promise<Response> {
     ? 201
     : result.code === "SLOT_UNAVAILABLE"
       ? 409
+      : result.code === "EMAIL_NOT_VERIFIED"
+        ? 400
       : result.code === "VALIDATION_ERROR"
         ? 400
         : result.code === "INTEGRATION_NOT_CONFIGURED"

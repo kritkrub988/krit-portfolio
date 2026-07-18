@@ -9,12 +9,16 @@ import type {
   BookingRequest,
   BookingResponse,
   BookingStatus,
+  EmailOtpResponse,
+  EmailOtpVerifyResponse,
 } from "./types.ts"
 import {
   parseAdminListResponse,
   parseAdminUpdateResponse,
   parseAppsScriptResponse,
   parseAvailabilityResponse,
+  parseEmailOtpResponse,
+  parseEmailOtpVerifyResponse,
 } from "./validation.ts"
 
 interface GoogleAppsScriptConfig {
@@ -81,6 +85,31 @@ export async function createTutorBooking(request: BookingRequest): Promise<Booki
   return (
     parseAppsScriptResponse(raw) ??
     integrationError("INVALID_UPSTREAM_RESPONSE", "รูปแบบข้อมูลตอบกลับจาก Apps Script ไม่ถูกต้อง")
+  )
+}
+
+export async function sendEmailOtp(email: string): Promise<EmailOtpResponse> {
+  const raw = await callAppsScript({ action: "sendEmailOtp", email })
+  return (
+    parseEmailOtpResponse(raw) ??
+    integrationError("INVALID_UPSTREAM_RESPONSE", "รูปแบบผลการส่งรหัสยืนยันไม่ถูกต้อง")
+  )
+}
+
+export async function verifyEmailOtp(
+  email: string,
+  requestId: string,
+  otp: string,
+): Promise<EmailOtpVerifyResponse> {
+  const raw = await callAppsScript({
+    action: "verifyEmailOtp",
+    email,
+    request_id: requestId,
+    otp,
+  })
+  return (
+    parseEmailOtpVerifyResponse(raw) ??
+    integrationError("INVALID_UPSTREAM_RESPONSE", "รูปแบบผลการยืนยันอีเมลไม่ถูกต้อง")
   )
 }
 

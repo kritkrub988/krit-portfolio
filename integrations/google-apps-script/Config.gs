@@ -24,6 +24,7 @@ var BOOKING_CONFIG = Object.freeze({
     "note",
     "status",
     "line_user_id",
+    "email",
   ],
   settingsRows: [
     ["course_name", "Level 2 + 2.5 Extra"],
@@ -165,13 +166,17 @@ function initializeSheets() {
       BOOKING_CONFIG.bookingHeaders,
     ]);
   } else {
-    var existingHeaders = bookings
-      .getRange(1, 1, 1, BOOKING_CONFIG.bookingHeaders.length)
-      .getDisplayValues()[0];
-    var headersMatch = BOOKING_CONFIG.bookingHeaders.every(function (header, index) {
+    var existingWidth = Math.max(bookings.getLastColumn(), BOOKING_CONFIG.bookingHeaders.length - 1);
+    var existingHeaders = bookings.getRange(1, 1, 1, existingWidth).getDisplayValues()[0];
+    var newHeadersMatch = BOOKING_CONFIG.bookingHeaders.every(function (header, index) {
       return existingHeaders[index] === header;
     });
-    if (!headersMatch) {
+    var legacyHeadersMatch = BOOKING_CONFIG.bookingHeaders.slice(0, -1).every(function (header, index) {
+      return existingHeaders[index] === header;
+    });
+    if (legacyHeadersMatch && !existingHeaders[BOOKING_CONFIG.bookingHeaders.length - 1]) {
+      bookings.getRange(1, BOOKING_CONFIG.bookingHeaders.length).setValue("email");
+    } else if (!newHeadersMatch) {
       throw new Error("CONFIGURATION_ERROR: Header ของ Sheet Bookings ไม่ตรงตามที่กำหนด");
     }
   }
@@ -215,6 +220,7 @@ function styleBookingsSheet_(sheet) {
   sheet.getRange("F:F").setNumberFormat("@");
   sheet.getRange("G:I").setNumberFormat("0");
   sheet.getRange("O:O").setNumberFormat("@");
+  sheet.getRange("P:P").setNumberFormat("@");
   var statusRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(["pending", "confirmed", "cancelled"], true)
     .setAllowInvalid(false)
