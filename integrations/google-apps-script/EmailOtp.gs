@@ -46,10 +46,8 @@ function handleSendEmailOtp_(rawEmail) {
       return errorResponse_("OTP_SEND_LIMIT", "ส่งรหัสเกินจำนวนที่กำหนด กรุณาลองใหม่ภายหลัง");
     }
 
-    if (meta.active_request_id) {
-      invalidateOtpRecord_(cache, recordKey + meta.active_request_id);
-    }
-
+    var previousMeta = JSON.parse(JSON.stringify(meta));
+    var previousRequestId = String(meta.active_request_id || "");
     var requestId = Utilities.getUuid().replace(/-/g, "");
     var otp = generateOtp_();
     var record = {
@@ -84,7 +82,20 @@ function handleSendEmailOtp_(rawEmail) {
       });
     } catch (error) {
       cache.remove(recordKey + requestId);
+      if (previousMeta && Object.keys(previousMeta).length > 0) {
+        cache.put(
+          metaKey,
+          JSON.stringify(previousMeta),
+          Math.ceil(EMAIL_OTP_CONFIG.sendWindowMs / 1000),
+        );
+      } else {
+        cache.remove(metaKey);
+      }
       return errorResponse_("EMAIL_SEND_FAILED", "ไม่สามารถส่งอีเมลได้ในขณะนี้ กรุณาลองใหม่ภายหลัง");
+    }
+
+    if (previousRequestId && previousRequestId !== requestId) {
+      invalidateOtpRecord_(cache, recordKey + previousRequestId);
     }
 
     return jsonResponse_({
@@ -95,7 +106,7 @@ function handleSendEmailOtp_(rawEmail) {
       resend_after_seconds: EMAIL_OTP_CONFIG.resendCooldownMs / 1000,
     });
   } finally {
-    lock.releaseLock();
+    releaseLockSafely_(lock);
   }
 }
 
@@ -140,15 +151,19 @@ function handleVerifyEmailOtp_(rawEmail, rawRequestId, rawOtp) {
       expires_at: Date.now() + EMAIL_OTP_CONFIG.otpTtlSeconds * 1000,
     };
     var verificationJson = JSON.stringify(verificationRecord);
-    cache.put("email_verified_" + verificationToken, verificationJson, EMAIL_OTP_CONFIG.otpTtlSeconds);
-    cleanupExpiredEmailVerificationTokens_();
     PropertiesService.getScriptProperties().setProperty(
       emailVerificationPropertyKey_(verificationToken),
       verificationJson,
     );
+    cache.put("email_verified_" + verificationToken, verificationJson, EMAIL_OTP_CONFIG.otpTtlSeconds);
+    try {
+      cleanupExpiredEmailVerificationTokens_();
+    } catch (cleanupError) {
+      safeLog_("EMAIL_VERIFICATION_CLEANUP_FAILED", "Expired token cleanup failed");
+    }
     return jsonResponse_({ success: true, message: "ยืนยันอีเมลสำเร็จ", verification_token: verificationToken, expires_in_seconds: EMAIL_OTP_CONFIG.otpTtlSeconds });
   } finally {
-    lock.releaseLock();
+    releaseLockSafely_(lock);
   }
 }
 
@@ -232,7 +247,11 @@ function isValidEmail_(value) {
 }
 
 function hashOtp_(otp, email, requestId) {
-  var input = otp + "|" + email + "|" + requestId + "|" + PropertiesService.getScriptProperties().getProperty("BOOKING_API_SECRET");
+  var secret = PropertiesService.getScriptProperties().getProperty("BOOKING_API_SECRET");
+  if (!secret) {
+    throw new Error("CONFIGURATION_ERROR: BOOKING_API_SECRET is missing");
+  }
+  var input = otp + "|" + email + "|" + requestId + "|" + secret;
   return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, input));
 }
 

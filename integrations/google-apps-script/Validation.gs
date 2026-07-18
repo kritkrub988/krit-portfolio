@@ -7,7 +7,7 @@ function parseBookingDate_(value) {
   var year = Number(match[1]);
   var month = Number(match[2]);
   var day = Number(match[3]);
-  var date = new Date(Date.UTC(year, month - 1, day, 5, 0, 0));
+  var date = new Date(Date.UTC(year, month - 1, day));
   if (
     date.getUTCFullYear() !== year ||
     date.getUTCMonth() !== month - 1 ||
@@ -25,8 +25,14 @@ function validateBookingRequest_(payload, settings) {
 
   var customerName = String(data.customer_name || "").trim();
   var phone = String(data.phone || "").trim();
-  var email = normalizeEmail_(data.email);
-  var emailVerificationToken = String(data.email_verification_token || "").trim();
+  var email = normalizeEmail_(data.email || "");
+  var emailVerificationToken = String(
+    data.email_verification_token ||
+    data.verification_token ||
+    data.verificationToken ||
+    data.emailVerificationToken ||
+    "",
+  ).trim();
   var bookingDate = String(data.booking_date || "").trim();
   var timeSlot = String(data.time_slot || "").trim();
   var learningFormat = String(data.learning_format || "").trim().toLowerCase();
@@ -35,15 +41,16 @@ function validateBookingRequest_(payload, settings) {
   var lineUserId = String(data.line_user_id || "").trim();
   var numberOfStudents = typeof data.number_of_students === "number"
     ? data.number_of_students
-    : NaN;
+    : Number(data.number_of_students);
   var parsedDate = parseBookingDate_(bookingDate);
 
   if (!customerName) errors.push("customer_name ต้องไม่ว่าง");
   if (customerName.length > 150) errors.push("customer_name ยาวเกิน 150 ตัวอักษร");
   if (!phone) errors.push("phone ต้องไม่ว่าง");
   if (phone.length > 50) errors.push("phone ยาวเกิน 50 ตัวอักษร");
-  if (!isValidEmail_(email)) errors.push("email ต้องเป็นอีเมลที่ถูกต้อง");
-  if (!emailVerificationToken) errors.push("ต้องยืนยันอีเมลก่อนจอง");
+  if (!email) errors.push("email ต้องไม่ว่าง");
+  else if (!isValidEmail_(email)) errors.push("email ไม่ถูกต้อง");
+  if (!emailVerificationToken) errors.push("email_verification_token ต้องไม่ว่าง");
   else if (emailVerificationToken.length > 200) errors.push("โทเค็นยืนยันอีเมลไม่ถูกต้อง");
   if (!parsedDate) errors.push("booking_date ต้องเป็นวันที่จริงในรูปแบบ YYYY-MM-DD");
   if (parsedDate) {

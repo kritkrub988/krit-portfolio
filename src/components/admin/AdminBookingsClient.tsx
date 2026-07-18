@@ -53,7 +53,7 @@ export default function AdminBookingsClient() {
       .filter((booking) => !status || booking.status === status)
       .filter((booking) => {
         if (!normalized) return true
-        return [booking.booking_reference, booking.customer_name, booking.phone].some((value) =>
+        return [booking.booking_reference, booking.customer_name, booking.phone, booking.email].some((value) =>
           value.toLowerCase().includes(normalized),
         )
       })
@@ -104,7 +104,7 @@ export default function AdminBookingsClient() {
       </div>
 
       <div className="mt-5 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="text-xs font-bold text-slate-600">ค้นหา Reference/ชื่อ/เบอร์
+        <label className="text-xs font-bold text-slate-600">ค้นหา Reference/ชื่อ/เบอร์/อีเมล
           <input value={query} onChange={(event) => setQuery(event.target.value)} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" />
         </label>
         <label className="text-xs font-bold text-slate-600">วันที่เรียน
@@ -127,8 +127,8 @@ export default function AdminBookingsClient() {
         <p className="mt-8 text-center font-semibold text-blue-700" role="status">กำลังโหลดรายการจอง…</p>
       ) : (
         <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="min-w-[1320px] w-full text-left text-sm">
-            <thead className="bg-slate-950 text-white"><tr>{["Reference", "สร้างเมื่อ", "วัน/เวลาเรียน", "ผู้จอง", "เบอร์โทร", "คน", "ราคา", "รูปแบบ/สถานที่", "หมายเหตุ", "สถานะ"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
+          <table className="min-w-[1480px] w-full text-left text-sm">
+            <thead className="bg-slate-950 text-white"><tr>{["Reference", "สร้างเมื่อ", "วัน/เวลาเรียน", "ผู้จอง", "เบอร์โทร", "อีเมล", "คน", "ราคา", "รูปแบบ/สถานที่", "หมายเหตุ", "สถานะ"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
             <tbody className="divide-y divide-slate-200">
               {filtered.map((booking) => (
                 <tr key={booking.booking_reference} className="align-top">
@@ -137,6 +137,7 @@ export default function AdminBookingsClient() {
                   <td className="px-4 py-4 font-semibold">{booking.booking_date}<br />{booking.time_slot}</td>
                   <td className="px-4 py-4">{booking.customer_name}</td>
                   <td className="px-4 py-4">{booking.phone}</td>
+                  <td className="px-4 py-4">{booking.email || "-"}</td>
                   <td className="px-4 py-4">{booking.number_of_students}</td>
                   <td className="px-4 py-4">{booking.price_per_person}/คน<br /><strong>{booking.total_price} บาท</strong></td>
                   <td className="px-4 py-4">{booking.learning_format}<br />{booking.location || "-"}</td>

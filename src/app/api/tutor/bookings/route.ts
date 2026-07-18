@@ -64,7 +64,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const result = await createTutorBooking(toBookingRequest(validation.data))
-  if (!result.success && ["UPSTREAM_TIMEOUT", "UPSTREAM_NETWORK_ERROR"].includes(result.code)) {
+  if (!result.success) {
     releaseSubmission(validation.data.submission_id)
   }
 

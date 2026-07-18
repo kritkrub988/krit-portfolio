@@ -142,6 +142,17 @@ test("email OTP verify success response parses", () => {
   })?.success, true)
 })
 
+test("email OTP verify compatibility response normalizes camel-case token", () => {
+  const parsed = parseEmailOtpVerifyResponse({
+    success: true,
+    message: "ยืนยันแล้ว",
+    verificationToken: "1234567890123456",
+    expires_in_seconds: 600,
+  })
+  assert.equal(parsed?.success, true)
+  if (parsed?.success) assert.equal(parsed.verification_token, "1234567890123456")
+})
+
 test("email OTP response rejects leaked OTP", () => {
   assert.equal(parseEmailOtpResponse({
     success: true,

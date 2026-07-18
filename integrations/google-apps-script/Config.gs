@@ -61,8 +61,20 @@ function getBookingHeaderMap_(sheet) {
   var headers = sheet.getRange(1, 1, 1, width).getDisplayValues()[0];
   var map = {};
   headers.forEach(function (header, index) {
-    var key = String(header || "").trim();
-    if (key) map[key] = index + 1;
+    var rawKey = String(header || "");
+    var key = rawKey.trim();
+    if (!key) return;
+    var canonicalKey = key.toLowerCase();
+    if (BOOKING_CONFIG.bookingHeaders.indexOf(canonicalKey) !== -1) {
+      if (map[canonicalKey]) {
+        throw new Error("CONFIGURATION_ERROR: Duplicate booking header " + canonicalKey);
+      }
+      if (rawKey !== canonicalKey) sheet.getRange(1, index + 1).setValue(canonicalKey);
+      map[canonicalKey] = index + 1;
+      return;
+    }
+    if (map[key]) throw new Error("CONFIGURATION_ERROR: Duplicate booking header " + key);
+    map[key] = index + 1;
   });
   BOOKING_CONFIG.bookingHeaders.forEach(function (header) {
     if (!map[header]) {
@@ -186,19 +198,7 @@ function initializeSheets() {
       BOOKING_CONFIG.bookingHeaders,
     ]);
   } else {
-    var existingWidth = Math.max(bookings.getLastColumn(), BOOKING_CONFIG.bookingHeaders.length - 1);
-    var existingHeaders = bookings.getRange(1, 1, 1, existingWidth).getDisplayValues()[0];
-    var newHeadersMatch = BOOKING_CONFIG.bookingHeaders.every(function (header, index) {
-      return existingHeaders[index] === header;
-    });
-    var legacyHeadersMatch = BOOKING_CONFIG.bookingHeaders.slice(0, -1).every(function (header, index) {
-      return existingHeaders[index] === header;
-    });
-    if (legacyHeadersMatch && !existingHeaders[BOOKING_CONFIG.bookingHeaders.length - 1]) {
-      bookings.getRange(1, BOOKING_CONFIG.bookingHeaders.length).setValue("email");
-    } else if (!newHeadersMatch) {
-      throw new Error("CONFIGURATION_ERROR: Header ของ Sheet Bookings ไม่ตรงตามที่กำหนด");
-    }
+    getBookingHeaderMap_(bookings);
   }
 
   styleBookingsSheet_(bookings);
@@ -230,21 +230,25 @@ function initializeSheets() {
 }
 
 function styleBookingsSheet_(sheet) {
+  var columns = getBookingHeaderMap_(sheet);
+  var width = sheet.getLastColumn();
+  var dataRowCount = Math.max(1, sheet.getMaxRows() - 1);
   sheet.setFrozenRows(1);
   sheet
-    .getRange(1, 1, 1, BOOKING_CONFIG.bookingHeaders.length)
+    .getRange(1, 1, 1, width)
     .setFontWeight("bold")
     .setBackground("#cfe2f3");
-  sheet.getRange("A:A").setNumberFormat("@");
-  sheet.getRange("B:D").setNumberFormat("@");
-  sheet.getRange("F:F").setNumberFormat("@");
-  sheet.getRange("G:I").setNumberFormat("0");
-  sheet.getRange("O:O").setNumberFormat("@");
-  sheet.getRange("P:P").setNumberFormat("@");
+  ["booking_reference", "created_at", "booking_date", "time_slot", "phone", "line_user_id", "email"]
+    .forEach(function (header) {
+      sheet.getRange(2, columns[header], dataRowCount, 1).setNumberFormat("@");
+    });
+  ["number_of_students", "price_per_person", "total_price"].forEach(function (header) {
+    sheet.getRange(2, columns[header], dataRowCount, 1).setNumberFormat("0");
+  });
   var statusRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(["pending", "confirmed", "cancelled"], true)
     .setAllowInvalid(false)
     .build();
-  sheet.getRange("N2:N").setDataValidation(statusRule);
-  sheet.autoResizeColumns(1, BOOKING_CONFIG.bookingHeaders.length);
+  sheet.getRange(2, columns.status, dataRowCount, 1).setDataValidation(statusRule);
+  sheet.autoResizeColumns(1, width);
 }

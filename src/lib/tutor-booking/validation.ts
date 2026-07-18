@@ -229,17 +229,16 @@ const emailOtpSendResponseSchema: z.ZodType<EmailOtpResponse> = z.discriminatedU
   bookingErrorResponseSchema,
 ])
 
-const emailOtpVerifyResponseSchema: z.ZodType<EmailOtpVerifyResponse> = z.discriminatedUnion("success", [
-  z
-    .object({
-      success: z.literal(true),
-      message: z.string().min(1),
-      verification_token: z.string().min(16),
-      expires_in_seconds: z.number().int().positive(),
-    })
-    .strict(),
-  bookingErrorResponseSchema,
-])
+const emailOtpVerifySuccessCompatibilitySchema = z
+  .object({
+    success: z.literal(true),
+    message: z.string().min(1),
+    verification_token: z.string().min(16).optional(),
+    verificationToken: z.string().min(16).optional(),
+    expires_in_seconds: z.number().int().positive(),
+  })
+  .strict()
+  .refine((value) => Boolean(value.verification_token || value.verificationToken))
 
 export function parseEmailOtpResponse(value: unknown): EmailOtpResponse | null {
   const result = emailOtpSendResponseSchema.safeParse(value)
@@ -247,8 +246,18 @@ export function parseEmailOtpResponse(value: unknown): EmailOtpResponse | null {
 }
 
 export function parseEmailOtpVerifyResponse(value: unknown): EmailOtpVerifyResponse | null {
-  const result = emailOtpVerifyResponseSchema.safeParse(value)
-  return result.success ? result.data : null
+  const errorResult = bookingErrorResponseSchema.safeParse(value)
+  if (errorResult.success) return errorResult.data
+
+  const successResult = emailOtpVerifySuccessCompatibilitySchema.safeParse(value)
+  if (!successResult.success) return null
+  return {
+    success: true,
+    message: successResult.data.message,
+    verification_token:
+      successResult.data.verification_token ?? successResult.data.verificationToken ?? "",
+    expires_in_seconds: successResult.data.expires_in_seconds,
+  }
 }
 
 const availabilityResponseSchema: z.ZodType<AvailabilityResponse> = z.discriminatedUnion(

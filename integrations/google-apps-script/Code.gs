@@ -112,14 +112,21 @@ function doPost(event) {
     rowValues.status = "pending";
     rowValues.line_user_id = booking.lineUserId;
     rowValues.email = booking.email;
+    var rowWidth = Math.max.apply(null, Object.keys(columns).map(function (header) {
+      return columns[header];
+    }));
+    var row = bookings.getRange(nextRow, 1, 1, rowWidth).getValues()[0];
     BOOKING_CONFIG.bookingHeaders.forEach(function (header) {
-      bookings.getRange(nextRow, columns[header]).setValue(rowValues[header]);
+      row[columns[header] - 1] = Object.prototype.hasOwnProperty.call(rowValues, header)
+        ? rowValues[header]
+        : "";
     });
+    bookings.getRange(nextRow, 1, 1, rowWidth).setValues([row]);
 
     markEmailVerificationUsed_(booking.emailVerificationToken);
 
     safeLog_("BOOKING_CREATED", bookingReference);
-    lock.releaseLock();
+    releaseLockSafely_(lock);
     lock = null;
 
     try {
@@ -144,7 +151,8 @@ function doPost(event) {
       },
     });
   } catch (error) {
-    if (error && String(error.message || "").indexOf("VALIDATION_ERROR:") === 0) {
+    var errorMessage = error && error.message ? String(error.message) : "";
+    if (errorMessage.indexOf("VALIDATION_ERROR:") === 0) {
       return jsonResponse_({
         success: false,
         code: "VALIDATION_ERROR",
@@ -152,13 +160,20 @@ function doPost(event) {
         errors: ["ไม่สามารถอ่าน JSON Request Body ได้"],
       });
     }
+    if (errorMessage.indexOf("NOT_FOUND:") === 0) {
+      return errorResponse_("NOT_FOUND", "ไม่พบรายการจองที่ระบุ");
+    }
+    if (errorMessage.indexOf("CONFIGURATION_ERROR:") === 0) {
+      safeLog_("CONFIGURATION_ERROR", "Booking configuration is invalid");
+      return errorResponse_("CONFIGURATION_ERROR", "ระบบยังตั้งค่าไม่ครบ กรุณาติดต่อผู้ดูแล");
+    }
     safeLog_("INTERNAL_ERROR", error && error.message ? error.message.split(":")[0] : "Unknown");
     return errorResponse_(
       "INTERNAL_ERROR",
       "ไม่สามารถบันทึกการจองได้ กรุณาลองใหม่อีกครั้ง",
     );
   } finally {
-    if (lock && lock.hasLock()) lock.releaseLock();
+    releaseLockSafely_(lock);
   }
 }
 
@@ -184,6 +199,7 @@ function notifyBookingCreated_(booking, bookingReference, pricing) {
     "เลขอ้างอิง: " + bookingReference,
     "ผู้จอง: " + booking.customerName,
     "โทรศัพท์: " + booking.phone,
+    "อีเมล: " + booking.email,
     "วันที่: " + booking.bookingDate,
     "เวลา: " + booking.timeSlot,
     "รูปแบบ: " + locationText,
@@ -348,6 +364,15 @@ function jsonResponse_(body) {
 
 function errorResponse_(code, message) {
   return jsonResponse_({ success: false, code: code, message: message });
+}
+
+function releaseLockSafely_(lock) {
+  if (!lock) return;
+  try {
+    lock.releaseLock();
+  } catch (releaseError) {
+    safeLog_("LOCK_RELEASE_FAILED", "Could not release script lock");
+  }
 }
 
 function safeLog_(code, detail) {
