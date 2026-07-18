@@ -188,3 +188,11 @@ function hashOtp_(otp, email, requestId) {
   var input = otp + "|" + email + "|" + requestId + "|" + PropertiesService.getScriptProperties().getProperty("BOOKING_API_SECRET");
   return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, input));
 }
+
+function sha256Hex_(value) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value || ""));
+  return bytes.map(function (byte) {
+    var normalized = byte < 0 ? byte + 256 : byte;
+    return (normalized < 16 ? "0" : "") + normalized.toString(16);
+  }).join("");
+}
