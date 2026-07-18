@@ -167,6 +167,10 @@ export default function BookingForm() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (isSubmitting || !timeSlot || !submissionId) return
+    if (!emailVerificationToken) {
+      setMessage("กรุณายืนยันอีเมลก่อนจอง")
+      return
+    }
     setIsSubmitting(true)
     setMessage("")
 

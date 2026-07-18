@@ -79,6 +79,7 @@ function doPost(event) {
       safeLog_("CONFIGURATION_ERROR", "Bookings sheet missing");
       return errorResponse_("CONFIGURATION_ERROR", "ไม่พบ Sheet Bookings กรุณารัน initializeSheets");
     }
+    var columns = getBookingHeaderMap_(bookings);
 
     var booking = validation.value;
     var emailVerification = validateEmailVerification_(booking.email, booking.emailVerificationToken);
@@ -94,28 +95,26 @@ function doPost(event) {
     var createdAt = Utilities.formatDate(new Date(), settings.timezone, "yyyy-MM-dd HH:mm:ss");
 
     var nextRow = bookings.getLastRow() + 1;
-    bookings.getRange(nextRow, 1, 1, 4).setNumberFormat("@");
-    bookings.getRange(nextRow, 6).setNumberFormat("@");
-    bookings.getRange(nextRow, 15).setNumberFormat("@");
-    bookings.getRange(nextRow, 16).setNumberFormat("@");
-    bookings.getRange(nextRow, 1, 1, BOOKING_CONFIG.bookingHeaders.length).setValues([[
-      bookingReference,
-      createdAt,
-      booking.bookingDate,
-      booking.timeSlot,
-      booking.customerName,
-      "'" + booking.phone,
-      booking.numberOfStudents,
-      pricing.pricePerPerson,
-      pricing.totalPrice,
-      settings.courseName,
-      booking.learningFormat,
-      booking.location,
-      booking.note,
-      "pending",
-      booking.lineUserId,
-      booking.email,
-    ]]);
+    var rowValues = {};
+    rowValues.booking_reference = bookingReference;
+    rowValues.created_at = createdAt;
+    rowValues.booking_date = booking.bookingDate;
+    rowValues.time_slot = booking.timeSlot;
+    rowValues.customer_name = booking.customerName;
+    rowValues.phone = "'" + booking.phone;
+    rowValues.number_of_students = booking.numberOfStudents;
+    rowValues.price_per_person = pricing.pricePerPerson;
+    rowValues.total_price = pricing.totalPrice;
+    rowValues.course_name = settings.courseName;
+    rowValues.learning_format = booking.learningFormat;
+    rowValues.location = booking.location;
+    rowValues.note = booking.note;
+    rowValues.status = "pending";
+    rowValues.line_user_id = booking.lineUserId;
+    rowValues.email = booking.email;
+    BOOKING_CONFIG.bookingHeaders.forEach(function (header) {
+      bookings.getRange(nextRow, columns[header]).setValue(rowValues[header]);
+    });
 
     markEmailVerificationUsed_(booking.emailVerificationToken);
 
@@ -233,10 +232,12 @@ function parseJsonBody_(event) {
 
 function isSlotUnavailable_(sheet, bookingDate, timeSlot) {
   if (sheet.getLastRow() < 2) return false;
-  var rows = sheet.getRange(2, 3, sheet.getLastRow() - 1, 12).getDisplayValues();
+  var columns = getBookingHeaderMap_(sheet);
+  var width = Math.max(sheet.getLastColumn(), BOOKING_CONFIG.bookingHeaders.length);
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, width).getDisplayValues();
   return rows.some(function (row) {
-    var status = String(row[11] || "").toLowerCase();
-    return row[0] === bookingDate && row[1] === timeSlot &&
+    var status = String(row[columns.status - 1] || "").toLowerCase();
+    return row[columns.booking_date - 1] === bookingDate && row[columns.time_slot - 1] === timeSlot &&
       (status === "pending" || status === "confirmed");
   });
 }
@@ -280,27 +281,18 @@ function handleListBookings_(requestedLimit) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 500) limit = 200;
   if (sheet.getLastRow() < 2) return jsonResponse_({ success: true, bookings: [] });
 
+  var columns = getBookingHeaderMap_(sheet);
   var rowCount = Math.min(limit, sheet.getLastRow() - 1);
   var startRow = sheet.getLastRow() - rowCount + 1;
-  var rows = sheet.getRange(startRow, 1, rowCount, 16).getDisplayValues().reverse();
+  var rows = sheet.getRange(startRow, 1, rowCount, Math.max(sheet.getLastColumn(), BOOKING_CONFIG.bookingHeaders.length)).getDisplayValues().reverse();
   var bookings = rows.map(function (row) {
+    function value(header) { return row[columns[header] - 1] || ""; }
     return {
-      booking_reference: row[0],
-      created_at: row[1],
-      booking_date: row[2],
-      time_slot: row[3],
-      customer_name: row[4],
-      phone: row[5],
-      number_of_students: Number(row[6]),
-      price_per_person: Number(row[7]),
-      total_price: Number(row[8]),
-      course_name: row[9],
-      learning_format: row[10],
-      location: row[11],
-      note: row[12],
-      status: row[13],
-      line_user_id: row[14],
-      email: row[15],
+      booking_reference: value("booking_reference"), created_at: value("created_at"), booking_date: value("booking_date"),
+      time_slot: value("time_slot"), customer_name: value("customer_name"), phone: value("phone"),
+      number_of_students: Number(value("number_of_students")), price_per_person: Number(value("price_per_person")),
+      total_price: Number(value("total_price")), course_name: value("course_name"), learning_format: value("learning_format"),
+      location: value("location"), note: value("note"), status: value("status"), line_user_id: value("line_user_id"), email: value("email"),
     };
   });
   return jsonResponse_({ success: true, bookings: bookings });
@@ -310,10 +302,8 @@ function createUniqueBookingReference_(sheet, bookingDate) {
   var datePart = bookingDate.replace(/-/g, "");
   var existing = {};
   if (sheet.getLastRow() > 1) {
-    sheet
-      .getRange(2, 1, sheet.getLastRow() - 1, 1)
-      .getDisplayValues()
-      .forEach(function (row) {
+    var columns = getBookingHeaderMap_(sheet);
+    sheet.getRange(2, columns.booking_reference, sheet.getLastRow() - 1, 1).getDisplayValues().forEach(function (row) {
         existing[row[0]] = true;
       });
   }
@@ -336,12 +326,13 @@ function updateBookingStatus(bookingReference, newStatus) {
 
   var sheet = getSpreadsheet_().getSheetByName(BOOKING_CONFIG.bookingsSheetName);
   if (!sheet) throw new Error("CONFIGURATION_ERROR: Bookings sheet missing");
+  var columns = getBookingHeaderMap_(sheet);
   var references = sheet.getLastRow() > 1
-    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues()
+    ? sheet.getRange(2, columns.booking_reference, sheet.getLastRow() - 1, 1).getDisplayValues()
     : [];
   for (var index = 0; index < references.length; index += 1) {
     if (references[index][0] === reference) {
-      sheet.getRange(index + 2, 14).setValue(status);
+      sheet.getRange(index + 2, columns.status).setValue(status);
       safeLog_("STATUS_UPDATED", reference);
       return { bookingReference: reference, status: status };
     }

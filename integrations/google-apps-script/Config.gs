@@ -54,6 +54,26 @@ function getSpreadsheet_() {
   return spreadsheet;
 }
 
+/** Return a header-name to 1-based column map and repair only missing headers. */
+function getBookingHeaderMap_(sheet) {
+  if (!sheet) throw new Error("CONFIGURATION_ERROR: Bookings sheet missing");
+  var width = Math.max(sheet.getLastColumn(), BOOKING_CONFIG.bookingHeaders.length);
+  var headers = sheet.getRange(1, 1, 1, width).getDisplayValues()[0];
+  var map = {};
+  headers.forEach(function (header, index) {
+    var key = String(header || "").trim();
+    if (key) map[key] = index + 1;
+  });
+  BOOKING_CONFIG.bookingHeaders.forEach(function (header) {
+    if (!map[header]) {
+      var column = Math.max(sheet.getLastColumn() + 1, 1);
+      sheet.getRange(1, column).setValue(header);
+      map[header] = column;
+    }
+  });
+  return map;
+}
+
 function getDefaultSettings_() {
   var values = {};
   BOOKING_CONFIG.settingsRows.forEach(function (row) {
