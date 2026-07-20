@@ -1,4 +1,5 @@
 import Image from "next/image"
+import Link from "next/link"
 import Container from "@/components/common/Container"
 import MotionWrapper from "@/components/common/MotionWrapper"
 import Section from "@/components/common/Section"
@@ -43,8 +44,14 @@ export default function ProjectsSection() {
                   </h3>
 
                   <p className="mt-1 text-sm text-slate-500">
-                    {project.description}
+                    {project.subtitle ?? project.description}
                   </p>
+
+                  {project.subtitle ? (
+                    <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-500">
+                      {project.description}
+                    </p>
+                  ) : null}
                 </div>
               </Card>
             )
@@ -53,13 +60,13 @@ export default function ProjectsSection() {
               <MotionWrapper key={project.title} delay={0.06 * index}>
                 {project.href ? (
                   project.href.startsWith("/") ? (
-                    <a
+                    <Link
                       href={project.href}
                       aria-label={`Open ${project.title}`}
                       className="block h-full rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
                     >
                       {projectCard}
-                    </a>
+                    </Link>
                   ) : (
                     <a
                       href={project.href}

@@ -1,5 +1,6 @@
 export type Project = {
   title: string
+  subtitle?: string
   description: string
   image: string
   technologies: string[]
@@ -8,6 +9,17 @@ export type Project = {
 }
 
 export const projects: Project[] = [
+  {
+    title: "AI PORTRAIT PROMPT",
+    subtitle: "Professional Portrait Prompt Builder",
+    description:
+      "ระบบสร้าง Prompt ภาพ Portrait ระดับ Production เลือก Model, Creative Direction, กล้อง, แสง, Film Look และ Shot List ผ่าน Dropdown พร้อมประกอบ Prompt แบบเรียลไทม์",
+    image: "/images/projects/ai-portrait-prompt.svg",
+    technologies: ["Next.js", "TypeScript", "IndexedDB"],
+    overview:
+      "Config-driven prompt workspace สำหรับวาง Creative Brief, Model Identity, Camera, Lighting, Color Pipeline และ Shot Planning โดยเก็บ Draft กับ Version History ใน Browser และไม่เชื่อมต่อ AI API",
+    href: "/projects/ai-portrait-prompt",
+  },
   {
     title: "KRIT HUB AI Tutor",
     description: "ระบบดูหลักสูตร ราคา และจองคิวเรียนคอมพิวเตอร์และ AI",

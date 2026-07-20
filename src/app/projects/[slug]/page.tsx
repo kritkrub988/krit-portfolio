@@ -16,7 +16,9 @@ function slugify(value: string) {
 }
 
 export function generateStaticParams() {
-  return projects.map((project) => ({ slug: slugify(project.title) }))
+  return projects
+    .filter((project) => !project.href?.startsWith("/projects/"))
+    .map((project) => ({ slug: slugify(project.title) }))
 }
 
 export default async function ProjectDetailPage({
