@@ -25,6 +25,8 @@ export default function ProjectsSection() {
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
           {projects.map((project, index) => {
+            const isInternalPage = project.href?.startsWith("/")
+              && !/^\/(?:pdf|images|downloads)\//i.test(project.href)
             const projectCard = (
               <Card className="group h-full overflow-hidden">
                 <div className="relative h-36 overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 sm:h-40">
@@ -59,7 +61,7 @@ export default function ProjectsSection() {
             return (
               <MotionWrapper key={project.title} delay={0.06 * index}>
                 {project.href ? (
-                  project.href.startsWith("/") ? (
+                  isInternalPage ? (
                     <Link
                       href={project.href}
                       aria-label={`Open ${project.title}`}
