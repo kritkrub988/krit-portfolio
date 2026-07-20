@@ -4,7 +4,7 @@ export const lookRecipes: LookRecipe[] = [
   {
     id: "PR-01",
     name: "Tokyo Soft Daylight",
-    recommendedModels: ["MODEL_A_YUNA", "MODEL_D_HANA"],
+    recommendedModels: ["MODEL_A_YUNA", "MODEL_D_HANA", "MODEL_E_AKARI", "MODEL_F_HAEUN"],
     goals: ["Portfolio Hero", "Personal Branding", "Social Content"],
     narrative: "A clean, natural portrait that feels photographed in a real lived-in room",
     location: "Apartment, café, or white-curtain room",
@@ -29,7 +29,7 @@ export const lookRecipes: LookRecipe[] = [
   {
     id: "PR-02",
     name: "Japanese Summer Memory",
-    recommendedModels: ["MODEL_A_YUNA"],
+    recommendedModels: ["MODEL_A_YUNA", "MODEL_E_AKARI"],
     goals: ["Japanese Photo Story", "Social Content", "Cinematic Story"],
     narrative: "A youthful summer memory told through movement and late-afternoon sunlight",
     location: "Riverbank, field, seaside town, bicycle path",
@@ -55,7 +55,7 @@ export const lookRecipes: LookRecipe[] = [
   {
     id: "PR-03",
     name: "Tokyo Youth Snapshot",
-    recommendedModels: ["MODEL_A_YUNA"],
+    recommendedModels: ["MODEL_A_YUNA", "MODEL_E_AKARI"],
     goals: ["Japanese Photo Story", "Social Content"],
     narrative: "A compact-camera photo diary with candid imperfections",
     location: "Convenience store, station, bedroom, karaoke, vending machine",
@@ -79,7 +79,7 @@ export const lookRecipes: LookRecipe[] = [
   {
     id: "PR-04",
     name: "Japanese Old Album",
-    recommendedModels: ["MODEL_A_YUNA", "MODEL_D_HANA"],
+    recommendedModels: ["MODEL_A_YUNA", "MODEL_D_HANA", "MODEL_E_AKARI", "MODEL_F_HAEUN"],
     goals: ["Japanese Photo Story", "Cinematic Story", "Social Content"],
     narrative: "A nostalgic family-album story without artificial damage effects",
     location: "Home interior, garden, quiet street",
@@ -153,7 +153,7 @@ export const lookRecipes: LookRecipe[] = [
   {
     id: "PR-07",
     name: "Japanese Minimal Studio",
-    recommendedModels: ["MODEL_B_MEI", "MODEL_C_RIN"],
+    recommendedModels: ["MODEL_B_MEI", "MODEL_C_RIN", "MODEL_F_HAEUN"],
     goals: ["Fashion Editorial", "Lookbook", "Portfolio Hero"],
     narrative: "A minimal studio editorial emphasizing silhouette and controlled posing",
     location: "Seamless studio",
@@ -177,7 +177,7 @@ export const lookRecipes: LookRecipe[] = [
   {
     id: "PR-08",
     name: "Japanese Countryside Film",
-    recommendedModels: ["MODEL_A_YUNA", "MODEL_D_HANA"],
+    recommendedModels: ["MODEL_A_YUNA", "MODEL_D_HANA", "MODEL_E_AKARI", "MODEL_F_HAEUN"],
     goals: ["Japanese Photo Story", "Social Content", "Cinematic Story"],
     narrative: "A rural Japanese lifestyle story with location depth and late-afternoon continuity",
     location: "Local railway, rice field, rural road, seaside town",
@@ -226,7 +226,7 @@ export const lookRecipes: LookRecipe[] = [
   {
     id: "PR-10",
     name: "Japanese Quiet Portrait",
-    recommendedModels: ["MODEL_C_RIN", "MODEL_D_HANA"],
+    recommendedModels: ["MODEL_C_RIN", "MODEL_D_HANA", "MODEL_F_HAEUN"],
     goals: ["Portfolio Hero", "Personal Branding", "Japanese Photo Story"],
     narrative: "A quiet fine-art portrait using geometry and large negative space",
     location: "Minimal room, empty corridor, quiet landscape",
@@ -301,7 +301,7 @@ export const lookRecipes: LookRecipe[] = [
   {
     id: "PR-13",
     name: "Clean Beauty Editorial",
-    recommendedModels: ["MODEL_B_MEI"],
+    recommendedModels: ["MODEL_B_MEI", "MODEL_F_HAEUN"],
     goals: ["Beauty Campaign", "Commercial Advertising", "Portfolio Hero"],
     narrative: "A clean premium commercial beauty campaign with product-ready precision",
     location: "Neutral seamless studio",

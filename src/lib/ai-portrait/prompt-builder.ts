@@ -14,6 +14,7 @@ import {
   findInvalidatedAnswerStepIds,
 } from "./dependency-rules.ts"
 import { validateStepAnswer } from "./validation.ts"
+import { validateModelSafety } from "./safety-validation.ts"
 import type {
   BuiltPrompt,
   LookRecipe,
@@ -58,13 +59,18 @@ const campaignTwelveShots = [
   "S12 — Vertical Copy-space",
 ]
 
-function modelIdentityContent(model: PortraitModel | null): string {
+function modelIdentityContent(model: PortraitModel | null, project: PortraitProject): string {
   if (!model) return "Model identity has not been selected."
   return [
     `MODEL_ID: ${model.id}`,
+    `SELECTION_MODE: ${(project.answers["step-2-1"]?.selectionMode ?? "manual").toUpperCase()}`,
     `IDENTITY_VERSION: ${model.identityVersion}`,
     `AGE_LOCK: ${model.age}`,
     `BACKGROUND_LOCK: ${model.background}`,
+    `NATIONALITY: ${model.nationality}`,
+    `AGE_STATUS: ${model.ageStatus}`,
+    `ROLE: ${model.role}`,
+    `PROMPT_IDENTITY: ${model.promptIdentity}`,
     `FACE: ${model.facialIdentity.join("; ")}`,
     `HAIR: ${model.hairIdentity.join("; ")}`,
     `UNIQUE_MARKER: ${model.uniqueMarker}`,
@@ -146,7 +152,7 @@ function createBlocks(
       .map((step) => step.id)
     let content = genericBlockContent(project, key)
 
-    if (key === "modelIdentity") content = modelIdentityContent(model)
+    if (key === "modelIdentity") content = modelIdentityContent(model, project)
     if (key === "lookRecipe") content = recipeContent(recipe)
     if (key === "shotPlanning") content = shotListContent(project)
     if (key === "negativeConstraints") content = negativeContent(model, recipe)
@@ -179,6 +185,9 @@ function buildWarnings(project: PortraitProject): PromptWarning[] {
       stepId,
       severity: "error",
     })
+  }
+  for (const issue of validateModelSafety(project)) {
+    warnings.push({ code: issue.code, message: issue.message, stepId: issue.stepId, severity: issue.severity === "critical" ? "error" : "warning" })
   }
   if (!project.briefApprovedAt) {
     warnings.push({
@@ -235,7 +244,7 @@ export function buildPortraitPrompt(
     brief,
     warnings,
     json: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       generatedAt: project.updatedAt,
       project: {
         name: project.name,

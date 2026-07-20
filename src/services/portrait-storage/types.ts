@@ -7,7 +7,7 @@ export type PortraitStorageStatus = {
 }
 
 export const PORTRAIT_DB_NAME = "krit-ai-portrait"
-export const PORTRAIT_DB_VERSION = 1
+export const PORTRAIT_DB_VERSION = 2
 
 export const PORTRAIT_STORES = {
   projects: "projects",
@@ -16,6 +16,7 @@ export const PORTRAIT_STORES = {
   customRecipes: "customRecipes",
   settings: "settings",
   exportHistory: "exportHistory",
+  decisionLogs: "decisionLogs",
 } as const
 
 export type PortraitStoreName =
@@ -25,8 +26,9 @@ export type StoredAnswer = {
   id: string
   projectId: string
   stepId: string
-  optionIds: string[]
+  selectionMode: "auto" | "manual" | "custom"
+  selectedOptionIds: string[]
+  resolvedOptionIds: string[]
   customValue?: string
   updatedAt: string
 }
-

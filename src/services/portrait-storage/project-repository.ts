@@ -1,4 +1,7 @@
 import { createPortraitId } from "@/lib/ai-portrait/ids"
+import { resolveAllAutomaticAnswers } from "@/lib/ai-portrait/auto-resolution-engine"
+import { createInitialAnswer, normalizePortraitProject } from "@/lib/ai-portrait/answer-utils"
+import { workflowSteps } from "@/data/ai-portrait"
 import {
   deleteRecordsByProjectId,
   requestToPromise,
@@ -14,6 +17,7 @@ import type {
   PortraitProjectRepository,
   ProjectAnswer,
   PromptVersion,
+  AutoDecisionLog,
 } from "@/types/ai-portrait"
 
 function nowIso(): string {
@@ -23,18 +27,20 @@ function nowIso(): string {
 export class IndexedDbPortraitProjectRepository implements PortraitProjectRepository {
   async createProject(input: CreateProjectInput): Promise<PortraitProject> {
     const timestamp = nowIso()
-    const project: PortraitProject = {
+    const base: PortraitProject = {
       id: createPortraitId("portrait"),
       name: input.name?.trim() || "Untitled Portrait Project",
       status: "draft",
       currentStepId: input.currentStepId,
-      answers: {},
+      answers: Object.fromEntries(workflowSteps.map((step) => [step.id, createInitialAnswer(step, timestamp)])),
       createdAt: timestamp,
       updatedAt: timestamp,
     }
+    const { project, logs } = resolveAllAutomaticAnswers(base, { triggeredBy: "project-created" })
 
-    await withStore(PORTRAIT_STORES.projects, "readwrite", async (transaction) => {
+    await withStore([PORTRAIT_STORES.projects, PORTRAIT_STORES.decisionLogs], "readwrite", async (transaction) => {
       await requestToPromise(transaction.objectStore(PORTRAIT_STORES.projects).add(project))
+      for (const log of logs) await requestToPromise(transaction.objectStore(PORTRAIT_STORES.decisionLogs).put(log))
     })
     return project
   }
@@ -44,7 +50,7 @@ export class IndexedDbPortraitProjectRepository implements PortraitProjectReposi
       const result = await requestToPromise(
         transaction.objectStore(PORTRAIT_STORES.projects).get(id) as IDBRequest<PortraitProject | undefined>,
       )
-      return result ?? null
+      return result ? resolveAllAutomaticAnswers(normalizePortraitProject(result), { triggeredBy: "project-opened" }).project : null
     })
   }
 
@@ -53,7 +59,7 @@ export class IndexedDbPortraitProjectRepository implements PortraitProjectReposi
       const projects = await requestToPromise(
         transaction.objectStore(PORTRAIT_STORES.projects).getAll() as IDBRequest<PortraitProject[]>,
       )
-      return projects.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      return projects.map(normalizePortraitProject).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     })
   }
 
@@ -87,6 +93,7 @@ export class IndexedDbPortraitProjectRepository implements PortraitProjectReposi
       PORTRAIT_STORES.promptVersions,
       PORTRAIT_STORES.customRecipes,
       PORTRAIT_STORES.exportHistory,
+      PORTRAIT_STORES.decisionLogs,
     ]
     await withStore(stores, "readwrite", async (transaction) => {
       transaction.objectStore(PORTRAIT_STORES.projects).delete(id)
@@ -95,6 +102,7 @@ export class IndexedDbPortraitProjectRepository implements PortraitProjectReposi
         deleteRecordsByProjectId(transaction, PORTRAIT_STORES.promptVersions, id),
         deleteRecordsByProjectId(transaction, PORTRAIT_STORES.customRecipes, id),
         deleteRecordsByProjectId(transaction, PORTRAIT_STORES.exportHistory, id),
+        deleteRecordsByProjectId(transaction, PORTRAIT_STORES.decisionLogs, id),
       ])
     })
   }
@@ -151,5 +159,21 @@ export class IndexedDbPortraitProjectRepository implements PortraitProjectReposi
       await requestToPromise(transaction.objectStore(PORTRAIT_STORES.promptVersions).delete(versionId))
     })
   }
-}
 
+  async saveAutoDecisionLogs(logs: AutoDecisionLog[]): Promise<void> {
+    if (logs.length === 0) return
+    await withStore(PORTRAIT_STORES.decisionLogs, "readwrite", async (transaction) => {
+      const store = transaction.objectStore(PORTRAIT_STORES.decisionLogs)
+      for (const log of logs) await requestToPromise(store.put(log))
+    })
+  }
+
+  async listAutoDecisionLogs(projectId: string): Promise<AutoDecisionLog[]> {
+    return withStore(PORTRAIT_STORES.decisionLogs, "readonly", async (transaction) => {
+      const logs = await requestToPromise(
+        transaction.objectStore(PORTRAIT_STORES.decisionLogs).index("projectId").getAll(IDBKeyRange.only(projectId)) as IDBRequest<AutoDecisionLog[]>,
+      )
+      return logs.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    })
+  }
+}

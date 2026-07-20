@@ -1,0 +1,185 @@
+import { portraitModelById, workflowStepById, workflowSteps } from "../../data/ai-portrait/index.ts"
+import type {
+  AutoConfidence,
+  AutoDecisionLog,
+  PortraitProject,
+  ProjectAnswer,
+  WorkflowOption,
+  WorkflowStep,
+} from "../../types/ai-portrait.ts"
+import { approvalStepIds, createInitialAnswer, effectiveOptionIds } from "./answer-utils.ts"
+import { getOptionAvailability } from "./dependency-rules.ts"
+
+export type AutoResolutionResult = {
+  optionIds: string[]
+  reason: string
+  confidence: AutoConfidence
+  warnings: string[]
+}
+
+export type AutoResolutionContext = {
+  triggeredBy?: string
+}
+
+function optionByCode(step: WorkflowStep, code: string): WorkflowOption | undefined {
+  return step.options?.find((option) => option.code === code)
+}
+
+function projectSignals(
+  project: PortraitProject,
+  options: { excludeStepIds?: Set<string>; manualIntentOnly?: boolean } = {},
+): string {
+  return Object.entries(project.answers)
+    .flatMap(([stepId, answer]) => {
+      if (options.excludeStepIds?.has(stepId)) return []
+      if (options.manualIntentOnly && answer.selectionMode === "auto") return []
+      const step = workflowStepById.get(stepId)
+      const labels = effectiveOptionIds(answer).map((id) => step?.options?.find((option) => option.id === id)?.label ?? "")
+      return [...labels, answer.customValue ?? ""]
+    })
+    .join(" ")
+    .toLowerCase()
+}
+
+function resolveModel(step: WorkflowStep, project: PortraitProject): AutoResolutionResult {
+  // Model selection must be derived from user intent, not from its own previous
+  // Auto result or downstream Auto answers generated for that previous model.
+  const signals = projectSignals(project, {
+    excludeStepIds: new Set(["step-2-1"]),
+    manualIntentOnly: true,
+  })
+  let code = "A"
+  let reason = "ยังไม่มี Creative Signal เพียงพอ จึงใช้ YUNA เป็นค่าเริ่มต้นชั่วคราว"
+  let confidence: AutoConfidence = "low"
+
+  if (/sexy|sensual|lingerie|swimwear|nightlife|provocative|adult commercial|เซ็กซี่|ยั่วยวน/.test(signals)) {
+    code = /luxury|cinematic|fashion/.test(signals) ? "C" : "B"
+    reason = "พบ Adult/Sensual signal จึงจำกัดการเลือกไว้ที่โมเดลผู้ใหญ่และไม่เลือกผู้เยาว์"
+    confidence = "high"
+  } else if (/korean|เกาหลี|campus|มหาวิทยาลัย|university/.test(signals)) {
+    code = "F"; reason = "โจทย์แนว Korean campus / university เหมาะกับ HAEUN"; confidence = "high"
+  } else if (/school|student|นักเรียน|มัธยม|after-school|youth/.test(signals)) {
+    code = "E"; reason = "โจทย์ school life / student youth เหมาะกับ AKARI แบบ family-safe"; confidence = "high"
+  } else if (/beauty|lookbook/.test(signals)) {
+    code = "B"; reason = "โจทย์ Beauty / Lookbook ตรงกับ Approved Styles ของ MEI"; confidence = "high"
+  } else if (/luxury|high fashion|cinematic|jewelry|quiet luxury/.test(signals)) {
+    code = "C"; reason = "โจทย์ Luxury / High Fashion / Cinematic เหมาะกับ RIN"; confidence = "high"
+  } else if (/branding|corporate|wellness|business|ผู้บริหาร/.test(signals)) {
+    code = "D"; reason = "โจทย์ Branding / Corporate / Wellness เหมาะกับ HANA"; confidence = "high"
+  } else if (/japanese|ญี่ปุ่น|photo story/.test(signals)) {
+    code = /school|student|นักเรียน|มัธยม/.test(signals) ? "E" : "A"
+    reason = "โจทย์ Japanese story จับคู่กับ YUNA หรือ AKARI ตามช่วงวัยและบริบท"
+    confidence = "medium"
+  }
+
+  const option = optionByCode(step, code) ?? step.options?.[0]
+  return { optionIds: option ? [option.id] : [], reason, confidence, warnings: [] }
+}
+
+function preferredCodes(stepId: string, signals: string): string[] {
+  const defaults: Record<string, string[]> = {
+    "step-0-1": ["A"], "step-0-2": ["A"], "step-0-3": ["G"], "step-0-4": ["B"],
+    "step-1-1": ["A"], "step-1-2": ["F"], "step-1-3": ["A"],
+    "step-3-2": ["A"], "step-4-1": ["C"], "step-4-2": ["F"], "step-4-3": ["B"],
+    "step-4-4": ["B"], "step-5-1": ["A"], "step-5-2": ["A"], "step-5-3": ["A"],
+    "step-5-4": ["A"], "step-6-1": ["A"], "step-7-2": ["B"], "step-7-3": ["A"],
+    "step-8-1": ["A"], "step-8-2": ["A"],
+  }
+  if (stepId === "step-1-1" && /school|student|youth|นักเรียน/.test(signals)) return ["C", "A"]
+  if (stepId === "step-1-3" && /luxury|fashion/.test(signals)) return ["D", "H", "B"]
+  if (stepId === "step-4-1" && /campus|school|library/.test(signals)) return ["C", "B"]
+  return defaults[stepId] ?? []
+}
+
+export function resolveAutomaticAnswer(
+  step: WorkflowStep,
+  project: PortraitProject,
+  _context: AutoResolutionContext = {},
+): AutoResolutionResult {
+  void _context
+  if (approvalStepIds.has(step.id)) {
+    return { optionIds: [], reason: "Approval ต้องยืนยันโดยผู้ใช้", confidence: "high", warnings: [] }
+  }
+  if (step.id === "step-2-1") return resolveModel(step, project)
+
+  const signals = projectSignals(project)
+  const available = (step.options ?? []).filter((option) => !getOptionAvailability(project, step.id, option).disabled)
+  const preferred = preferredCodes(step.id, signals)
+  let option = preferred.flatMap((code) => available.filter((candidate) => candidate.code === code))[0]
+
+  if (step.id === "step-3-1") {
+    const modelId = project.selectedModelId
+    option = available.find((candidate) => {
+      const recipeId = candidate.metadata?.recipeId
+      if (typeof recipeId !== "string" || !modelId) return false
+      const model = portraitModelById.get(modelId)
+      return model?.approvedStyles.some((style) => candidate.label.toLowerCase().includes(style.toLowerCase().split(" ")[0] ?? ""))
+    }) ?? available[0]
+  } else if (step.id === "step-3-3") {
+    option = available.find((candidate) => {
+      const id = candidate.metadata?.cameraPackageId
+      const model = portraitModelById.get(project.selectedModelId ?? "")
+      return typeof id === "string" && model?.cameraPackageIds.includes(id)
+    }) ?? available[0]
+  }
+
+  option ??= available[0]
+  return {
+    optionIds: option ? [option.id] : [],
+    reason: option
+      ? `เลือก ${option.label} จากความปลอดภัย ความเข้ากันกับโมเดล เป้าหมาย และค่าตั้งต้นของ workflow`
+      : "ไม่มีตัวเลือกที่ผ่านข้อจำกัดในขณะนี้",
+    confidence: preferred.includes(option?.code ?? "") ? "high" : available.length > 0 ? "medium" : "low",
+    warnings: option ? [] : ["AUTO_NO_SAFE_OPTION"],
+  }
+}
+
+export function resolveAllAutomaticAnswers(
+  project: PortraitProject,
+  context: AutoResolutionContext = {},
+): { project: PortraitProject; logs: AutoDecisionLog[] } {
+  const timestamp = new Date().toISOString()
+  const next = { ...project, answers: { ...project.answers } }
+  const logs: AutoDecisionLog[] = []
+
+  for (const step of workflowSteps) {
+    const existing = next.answers[step.id] ?? createInitialAnswer(step, timestamp)
+    if (existing.selectionMode !== "auto" || approvalStepIds.has(step.id)) {
+      next.answers[step.id] = existing
+      continue
+    }
+    const result = resolveAutomaticAnswer(step, next, context)
+    const previous = effectiveOptionIds(existing)
+    const answer: ProjectAnswer = {
+      ...existing,
+      resolvedOptionIds: result.optionIds,
+      autoReason: result.reason,
+      autoConfidence: result.confidence,
+      updatedAt: timestamp,
+    }
+    next.answers[step.id] = answer
+    if (step.id === "step-2-1") {
+      const selected = step.options?.find((option) => option.id === result.optionIds[0])
+      next.selectedModelId = typeof selected?.metadata?.modelId === "string" ? selected.metadata.modelId : undefined
+    }
+    if (step.id === "step-3-1") {
+      const selected = step.options?.find((option) => option.id === result.optionIds[0])
+      next.selectedRecipeId = typeof selected?.metadata?.recipeId === "string" ? selected.metadata.recipeId : undefined
+    }
+    if (previous.join("|") !== result.optionIds.join("|") || !existing.autoReason) {
+      logs.push({
+        id: `auto_${project.id}_${step.id}_${Date.now()}_${logs.length}`,
+        projectId: project.id,
+        stepId: step.id,
+        previousOptionIds: previous,
+        resolvedOptionIds: result.optionIds,
+        reason: result.reason,
+        confidence: result.confidence,
+        warnings: result.warnings,
+        triggeredBy: context.triggeredBy,
+        createdAt: timestamp,
+      })
+    }
+  }
+  return { project: { ...next, updatedAt: timestamp }, logs }
+}

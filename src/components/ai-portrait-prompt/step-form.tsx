@@ -4,6 +4,7 @@ import { lookRecipeById, portraitModelById } from "@/data/ai-portrait"
 import { getOptionAvailability } from "@/lib/ai-portrait/dependency-rules"
 import { recommendedOptionIds } from "@/lib/ai-portrait/recommendation-engine"
 import { validateStepAnswer } from "@/lib/ai-portrait/validation"
+import { approvalStepIds, effectiveOptionIds } from "@/lib/ai-portrait/answer-utils"
 import { ModelDetailCard } from "@/components/ai-portrait-prompt/model-detail-card"
 import { RecipeDetailCard } from "@/components/ai-portrait-prompt/recipe-detail-card"
 import type { PortraitProject, ProjectAnswer, WorkflowStep } from "@/types/ai-portrait"
@@ -33,15 +34,26 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
   const answer = project.answers[step.id]
   const errors = validateStepAnswer(step, answer)
   const recommendations = recommendedOptionIds(project, step.id)
-  const firstSelectedId = answer?.optionIds[0] ?? ""
+  const optionIds = effectiveOptionIds(answer)
+  const firstSelectedId = optionIds[0] ?? ""
   const selectedOption = step.options?.find((option) => option.id === firstSelectedId)
-  const showCustom = step.allowsCustom && (Boolean(answer?.customValue) || /custom|กำหนดเอง|ผู้ใช้กำหนดเอง/i.test(selectedOption?.label ?? ""))
+  const mode = answer?.selectionMode ?? (approvalStepIds.has(step.id) ? "manual" : "auto")
+  const showCustom = step.allowsCustom && mode === "custom"
   const model = selectedModel(project, step)
   const recipe = selectedRecipe(project, step)
   const inputId = `portrait-${step.id}`
 
-  function emit(optionIds: string[], customValue = answer?.customValue) {
-    onChange({ stepId: step.id, optionIds, customValue, updatedAt: new Date().toISOString() })
+  function emit(selectedOptionIds: string[], customValue = answer?.customValue, selectionMode = mode) {
+    onChange({
+      stepId: step.id,
+      selectionMode,
+      selectedOptionIds,
+      resolvedOptionIds: answer?.resolvedOptionIds ?? [],
+      customValue,
+      autoReason: answer?.autoReason,
+      autoConfidence: answer?.autoConfidence,
+      updatedAt: new Date().toISOString(),
+    })
   }
 
   return (
@@ -55,16 +67,56 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
       ) : null}
 
       <div className="mt-7 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        {step.inputType === "multiselect" ? (
+        {!approvalStepIds.has(step.id) ? (
+          <label htmlFor={`${inputId}-mode`} className="mb-5 block text-sm font-bold text-slate-900">
+            Selection Mode
+            <select
+              id={`${inputId}-mode`}
+              value={step.id === "step-2-1" && mode === "manual" ? `model:${answer?.selectedOptionIds[0] ?? ""}` : mode}
+              onChange={(event) => {
+                if (event.target.value.startsWith("model:")) {
+                  emit([event.target.value.slice(6)], undefined, "manual")
+                  return
+                }
+                const nextMode = event.target.value as "auto" | "manual" | "custom"
+                const promoted = nextMode === "manual" && mode === "auto" ? optionIds : answer?.selectedOptionIds ?? []
+                emit(promoted, nextMode === "custom" ? answer?.customValue : undefined, nextMode)
+              }}
+              className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            >
+              <option value="auto">AUTO. อัตโนมัติ</option>
+              {step.id === "step-2-1" ? step.options?.map((option) => <option key={option.id} value={`model:${option.id}`}>{option.label}</option>) : <option value="manual">MANUAL. เลือกเอง</option>}
+              {step.id !== "step-2-1" && step.allowsCustom ? <option value="custom">CUSTOM. กำหนดเอง</option> : null}
+            </select>
+          </label>
+        ) : null}
+
+        {mode !== "auto" ? <span className={`mb-4 inline-flex rounded-full px-2.5 py-1 text-[11px] font-black text-white ${mode === "custom" ? "bg-violet-700" : "bg-slate-700"}`}>{mode.toUpperCase()}</span> : null}
+
+        {mode === "auto" ? (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4" aria-live="polite">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="rounded-full bg-blue-700 px-2.5 py-1 text-[11px] font-black text-white">AUTO</span>
+              <span className="text-xs font-bold uppercase text-blue-800">Confidence: {answer?.autoConfidence ?? "low"}</span>
+            </div>
+            <p className="mt-3 text-xs font-black uppercase tracking-wider text-blue-700">ค่าที่ระบบแนะนำ</p>
+            <p className="mt-1 font-bold text-slate-950">{optionIds.map((id) => step.options?.find((option) => option.id === id)?.label).filter(Boolean).join(", ") || "กำลังประเมิน"}</p>
+            <details className="mt-3 text-sm text-slate-700">
+              <summary className="cursor-pointer font-bold">แสดงรายละเอียด Auto Decision</summary>
+              <p className="mt-2 leading-6">{answer?.autoReason ?? "ระบบจะประเมินจาก Model safety, goal, platform, recipe และ technical compatibility"}</p>
+            </details>
+            <button type="button" onClick={() => emit(optionIds, undefined, "manual")} className="mt-4 rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs font-bold text-blue-800">ใช้ค่าที่ระบบแนะนำเป็น Manual</button>
+          </div>
+        ) : step.id === "step-2-1" ? null : step.inputType === "multiselect" ? (
           <fieldset>
             <legend className="text-sm font-bold text-slate-900">เลือกได้มากกว่าหนึ่งรายการ</legend>
             <div className="mt-3 grid gap-2">
               {step.options?.map((option) => {
                 const availability = getOptionAvailability(project, step.id, option)
-                const checked = answer?.optionIds.includes(option.id) ?? false
+                const checked = answer?.selectedOptionIds.includes(option.id) ?? false
                 return (
                   <label key={option.id} className={`flex gap-3 rounded-2xl border p-3 ${checked ? "border-blue-500 bg-blue-50" : "border-slate-200"} ${availability.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
-                    <input type="checkbox" checked={checked} disabled={availability.disabled} onChange={(event) => emit(event.target.checked ? [...(answer?.optionIds ?? []), option.id] : (answer?.optionIds ?? []).filter((id) => id !== option.id))} />
+                    <input type="checkbox" checked={checked} disabled={availability.disabled} onChange={(event) => emit(event.target.checked ? [...(answer?.selectedOptionIds ?? []), option.id] : (answer?.selectedOptionIds ?? []).filter((id) => id !== option.id))} />
                     <span><span className="font-bold text-slate-900">{option.code}. {option.label}</span><span className="mt-1 block text-xs text-slate-500">{availability.reason ?? option.description}</span></span>
                   </label>
                 )
@@ -76,7 +128,7 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
             เลือกคำตอบ
             <select
               id={inputId}
-              value={firstSelectedId}
+              value={answer?.selectedOptionIds[0] ?? ""}
               onChange={(event) => emit(event.target.value ? [event.target.value] : [], "")}
               className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3.5 text-base font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             >
@@ -90,14 +142,14 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
           </label>
         )}
 
-        {recommendations.size > 0 ? (
+        {mode === "manual" && recommendations.size > 0 ? (
           <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-xs font-black uppercase tracking-wider text-emerald-800">แนะนำไม่เกิน 2 ตัวเลือก</p>
             <ul className="mt-2 space-y-1 text-sm text-emerald-900">{[...recommendations].map(([optionId, reason]) => <li key={optionId}>• {step.options?.find((option) => option.id === optionId)?.label}: {reason}</li>)}</ul>
           </div>
         ) : null}
 
-        {selectedOption ? (
+        {mode !== "auto" && selectedOption ? (
           <div className="mt-4 rounded-2xl bg-slate-50 p-4">
             <p className="text-xs font-black uppercase tracking-wider text-slate-500">Selected option</p>
             <p className="mt-1 font-bold text-slate-900">{selectedOption.label}</p>
@@ -108,7 +160,7 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
         {showCustom ? (
           <label htmlFor={`${inputId}-custom`} className="mt-5 block text-sm font-bold text-slate-900">
             รายละเอียด Custom
-            <textarea id={`${inputId}-custom`} value={answer?.customValue ?? ""} onChange={(event) => emit(answer?.optionIds ?? [], event.target.value)} rows={5} className="mt-2 w-full resize-y rounded-2xl border border-slate-300 px-4 py-3 font-normal outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="ระบุรายละเอียดที่ต้องการ..." />
+            <textarea id={`${inputId}-custom`} value={answer?.customValue ?? ""} onChange={(event) => emit([], event.target.value, "custom")} rows={5} className="mt-2 w-full resize-y rounded-2xl border border-slate-300 px-4 py-3 font-normal outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="ระบุรายละเอียดที่ต้องการ..." />
           </label>
         ) : null}
       </div>
@@ -127,4 +179,3 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
     </section>
   )
 }
-

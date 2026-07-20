@@ -83,11 +83,33 @@ export type WorkflowDefinition = {
   phases: WorkflowPhase[]
 }
 
+export type SelectionMode = "auto" | "manual" | "custom"
+export type AutoConfidence = "high" | "medium" | "low"
+
 export type ProjectAnswer = {
   stepId: string
-  optionIds: string[]
+  selectionMode: SelectionMode
+  selectedOptionIds: string[]
+  resolvedOptionIds: string[]
+  /** Kept only so V1 snapshots can be read without rewriting history. */
+  optionIds?: string[]
   customValue?: string
+  autoReason?: string
+  autoConfidence?: AutoConfidence
   updatedAt: string
+}
+
+export type AutoDecisionLog = {
+  id: string
+  projectId: string
+  stepId: string
+  previousOptionIds: string[]
+  resolvedOptionIds: string[]
+  reason: string
+  confidence: AutoConfidence
+  warnings: string[]
+  triggeredBy?: string
+  createdAt: string
 }
 
 export type CameraPackage = {
@@ -109,7 +131,11 @@ export type PortraitModel = {
   stageName: string
   identityVersion: string
   age: number
+  nationality: string
+  ageStatus: "MINOR" | "ADULT"
+  role: string
   background: string
+  promptIdentity: string
   character: string[]
   primaryWork: string[]
   facialIdentity: string[]
@@ -211,7 +237,7 @@ export type PromptWarning = {
 }
 
 export type PortraitPromptExport = {
-  schemaVersion: 1
+  schemaVersion: 2
   generatedAt: string
   project: PortraitProjectSnapshot
   model: PortraitModel | null
@@ -262,4 +288,6 @@ export interface PortraitProjectRepository {
   savePromptVersion(projectId: string, version: PromptVersion): Promise<void>
   listPromptVersions(projectId: string): Promise<PromptVersion[]>
   deletePromptVersion(versionId: string): Promise<void>
+  saveAutoDecisionLogs?(logs: AutoDecisionLog[]): Promise<void>
+  listAutoDecisionLogs?(projectId: string): Promise<AutoDecisionLog[]>
 }

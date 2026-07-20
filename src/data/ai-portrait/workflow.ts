@@ -53,7 +53,7 @@ function createStep(
   }
 }
 
-const phases: WorkflowPhase[] = [
+const sourcePhases: WorkflowPhase[] = [
   {
     id: "phase-0",
     code: "0",
@@ -155,10 +155,12 @@ const phases: WorkflowPhase[] = [
     order: 2,
     steps: [
       createStep("phase-2", 0, "2.1", "เลือก Model", "modelIdentity", [
-        { code: "A", label: "YUNA — 19", description: "Cute / Fresh / Playful — Youth, Lifestyle, Japanese Snapshot", promptValue: "YUNA", metadata: { modelId: "MODEL_A_YUNA" } },
-        { code: "B", label: "MEI — 23", description: "Fashion / Elegant / Clean Beauty — Beauty, Editorial, Lookbook", promptValue: "MEI", metadata: { modelId: "MODEL_B_MEI" } },
-        { code: "C", label: "RIN — 28", description: "Bold / Luxury / Dark Feminine — High Fashion, Luxury, Cinematic", promptValue: "RIN", metadata: { modelId: "MODEL_C_RIN" } },
-        { code: "D", label: "HANA — 33", description: "Professional / Fit / Modern — Branding, Corporate, Wellness", promptValue: "HANA", metadata: { modelId: "MODEL_D_HANA" } },
+        { code: "A", label: "YUNA — 19 · ญี่ปุ่น · ADULT", description: "Cute / Fresh / Playful — Youth, Lifestyle, Japanese Snapshot", promptValue: "YUNA", metadata: { modelId: "MODEL_A_YUNA" } },
+        { code: "B", label: "MEI — 23 · จีน · ADULT", description: "Fashion / Elegant / Clean Beauty — Beauty, Editorial, Lookbook", promptValue: "MEI", metadata: { modelId: "MODEL_B_MEI" } },
+        { code: "C", label: "RIN — 28 · ญี่ปุ่น–จีน · ADULT", description: "Bold / Luxury / Dark Feminine — High Fashion, Luxury, Cinematic", promptValue: "RIN", metadata: { modelId: "MODEL_C_RIN" } },
+        { code: "D", label: "HANA — 33 · เกาหลีใต้ · ADULT", description: "Professional / Fit / Modern — Branding, Corporate, Wellness", promptValue: "HANA", metadata: { modelId: "MODEL_D_HANA" } },
+        { code: "E", label: "AKARI — 17 · ญี่ปุ่น · MINOR", description: "Family-safe school life / student lifestyle / cute portrait", promptValue: "AKARI", metadata: { modelId: "MODEL_E_AKARI" } },
+        { code: "F", label: "HAEUN — 18 · เกาหลีใต้ · ADULT", description: "Modern campus / café / library / clean Korean casual", promptValue: "HAEUN", metadata: { modelId: "MODEL_F_HAEUN" } },
       ]),
       createStep("phase-2", 1, "2.2", "Identity Lock", "modelIdentity", [
         { code: "A", label: "ใช้ Official Identity Version", promptValue: "Official identity version approved and locked" },
@@ -197,7 +199,7 @@ const phases: WorkflowPhase[] = [
       ], { allowsCustom: true }),
       createStep("phase-3", 2, "3.3", "ล็อก Camera Package", "cameraPackage", [
         ...cameraPackages.map((cameraPackage, index) => ({
-          code: String.fromCharCode(65 + index),
+          code: cameraPackage.id === "CAM_AKARI_SCHOOL_LIFE" ? "J" : cameraPackage.id === "CAM_HAEUN_CAMPUS" ? "K" : String.fromCharCode(65 + index),
           label: cameraPackage.name,
           description: `${cameraPackage.camera} + ${cameraPackage.lens}; ${cameraPackage.aperture}; ${cameraPackage.opticalCharacter}`,
           promptValue: `${cameraPackage.camera}, ${cameraPackage.lens}, ${cameraPackage.aperture}, ${cameraPackage.distance}, ${cameraPackage.height}`,
@@ -393,8 +395,29 @@ const phases: WorkflowPhase[] = [
   },
 ]
 
+const displayPhaseOrder = ["phase-2", "phase-0", "phase-1", "phase-3", "phase-4", "phase-5", "phase-6", "phase-7", "phase-8", "phase-9", "phase-10"]
+const displayTitles: Record<string, string> = {
+  "phase-2": "Model Selection",
+  "phase-0": "Project Setup",
+  "phase-1": "Creative Direction",
+  "phase-3": "Look Recipe",
+  "phase-4": "Set / Location / Atmosphere",
+  "phase-5": "Styling",
+  "phase-6": "Lighting",
+  "phase-7": "Color",
+  "phase-8": "Shot Planning",
+  "phase-9": "Final Brief",
+  "phase-10": "Prompt Package",
+}
+
+const phases: WorkflowPhase[] = displayPhaseOrder.map((phaseId, order) => {
+  const phase = sourcePhases.find((item) => item.id === phaseId)
+  if (!phase) throw new Error(`Missing workflow phase: ${phaseId}`)
+  return { ...phase, order, title: displayTitles[phaseId] ?? phase.title }
+})
+
 export const portraitWorkflow: WorkflowDefinition = {
-  version: "5.0-web-mvp",
+  version: "5.1-auto-models",
   phases,
 }
 
@@ -404,4 +427,4 @@ export const workflowStepById = new Map(
   workflowSteps.map((step) => [step.id, step]),
 )
 
-export const firstWorkflowStepId = workflowSteps[0]?.id ?? "step-0-1"
+export const firstWorkflowStepId = workflowSteps[0]?.id ?? "step-2-1"

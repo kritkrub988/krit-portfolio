@@ -3,7 +3,7 @@ import {
   PORTRAIT_DB_VERSION,
   PORTRAIT_STORES,
   type PortraitStoreName,
-} from "@/services/portrait-storage/types"
+} from "./types.ts"
 
 let databasePromise: Promise<IDBDatabase> | null = null
 
@@ -26,7 +26,17 @@ export function transactionToPromise(transaction: IDBTransaction): Promise<void>
   })
 }
 
-function migrateDatabase(database: IDBDatabase, transaction: IDBTransaction): void {
+export function migrateV1AnswerRecord<T extends { optionIds?: string[]; stepId: string; updatedAt: string }>(answer: T) {
+  const optionIds = answer.optionIds ?? []
+  return {
+    ...answer,
+    selectionMode: optionIds.length > 0 ? "manual" as const : "auto" as const,
+    selectedOptionIds: optionIds.length > 0 ? [...optionIds] : [],
+    resolvedOptionIds: [...optionIds],
+  }
+}
+
+function migrateDatabase(database: IDBDatabase, transaction: IDBTransaction, oldVersion: number): void {
   if (!database.objectStoreNames.contains(PORTRAIT_STORES.projects)) {
     const store = database.createObjectStore(PORTRAIT_STORES.projects, { keyPath: "id" })
     store.createIndex("updatedAt", "updatedAt")
@@ -58,6 +68,37 @@ function migrateDatabase(database: IDBDatabase, transaction: IDBTransaction): vo
     store.createIndex("projectId", "projectId")
   }
 
+  if (!database.objectStoreNames.contains(PORTRAIT_STORES.decisionLogs)) {
+    const store = database.createObjectStore(PORTRAIT_STORES.decisionLogs, { keyPath: "id" })
+    store.createIndex("projectId", "projectId")
+  }
+
+  if (oldVersion > 0 && oldVersion < 2) {
+    const migrateCursor = (storeName: typeof PORTRAIT_STORES.answers | typeof PORTRAIT_STORES.projects) => {
+      const store = transaction.objectStore(storeName)
+      const request = store.openCursor()
+      request.onsuccess = () => {
+        const cursor = request.result
+        if (!cursor) return
+        if (storeName === PORTRAIT_STORES.answers) {
+          cursor.update(migrateV1AnswerRecord(cursor.value))
+        } else {
+          const project = cursor.value
+          const answers = Object.fromEntries(
+            Object.entries(project.answers ?? {}).map(([stepId, raw]) => [
+              stepId,
+              migrateV1AnswerRecord({ ...(raw as Record<string, unknown>), stepId, updatedAt: (raw as { updatedAt?: string }).updatedAt ?? project.updatedAt }),
+            ]),
+          )
+          cursor.update({ ...project, answers })
+        }
+        cursor.continue()
+      }
+    }
+    migrateCursor(PORTRAIT_STORES.answers)
+    migrateCursor(PORTRAIT_STORES.projects)
+  }
+
   void transaction
 }
 
@@ -70,9 +111,9 @@ export function openPortraitDatabase(): Promise<IDBDatabase> {
   databasePromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(PORTRAIT_DB_NAME, PORTRAIT_DB_VERSION)
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       if (!request.transaction) throw new Error("IndexedDB migration transaction is missing")
-      migrateDatabase(request.result, request.transaction)
+      migrateDatabase(request.result, request.transaction, event.oldVersion)
     }
     request.onsuccess = () => {
       const database = request.result
@@ -127,4 +168,3 @@ export async function deleteRecordsByProjectId(
     request.onerror = () => reject(request.error ?? new Error("Could not delete project records"))
   })
 }
-

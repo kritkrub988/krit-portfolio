@@ -1,12 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import type { BuiltPrompt, PromptBlockKey, PromptVersion } from "@/types/ai-portrait"
+import type { BuiltPrompt, PortraitProject, PromptBlockKey, PromptVersion } from "@/types/ai-portrait"
 
 type PreviewTab = "blocks" | "brief" | "final" | "versions"
 
 type LivePromptPreviewProps = {
   builtPrompt: BuiltPrompt
+  project: PortraitProject
   canUseFinal: boolean
   saveStatus: "idle" | "saving" | "saved" | "error"
   versions: PromptVersion[]
@@ -22,8 +23,9 @@ type LivePromptPreviewProps = {
   onDeleteVersion: (version: PromptVersion) => void
 }
 
-export function LivePromptPreview({ builtPrompt, canUseFinal, saveStatus, versions, highlightedBlock, onCopyPrompt, onCopyBlock, onSaveVersion, onExport, onReset, onCopyVersion, onExportVersion, onRestoreVersion, onDeleteVersion }: LivePromptPreviewProps) {
+export function LivePromptPreview({ builtPrompt, project, canUseFinal, saveStatus, versions, highlightedBlock, onCopyPrompt, onCopyBlock, onSaveVersion, onExport, onReset, onCopyVersion, onExportVersion, onRestoreVersion, onDeleteVersion }: LivePromptPreviewProps) {
   const [tab, setTab] = useState<PreviewTab>("blocks")
+  const [showDecisions, setShowDecisions] = useState(false)
   const tabs: Array<[PreviewTab, string]> = [["blocks", "Live Blocks"], ["brief", "Brief"], ["final", "Final Prompt"], ["versions", `Versions (${versions.length})`]]
   return (
     <aside className="flex h-full min-h-[36rem] flex-col border-l border-slate-200 bg-slate-950 text-slate-100 lg:max-h-[calc(100vh-4rem)]">
@@ -32,6 +34,8 @@ export function LivePromptPreview({ builtPrompt, canUseFinal, saveStatus, versio
         <div className="mt-4 flex gap-1 overflow-x-auto" role="tablist" aria-label="Prompt preview modes">
           {tabs.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold ${tab === value ? "bg-white text-slate-950" : "text-slate-300 hover:bg-white/10"}`}>{label}</button>)}
         </div>
+        <button type="button" onClick={() => setShowDecisions((value) => !value)} className="mt-3 text-xs font-bold text-blue-300" aria-expanded={showDecisions}>{showDecisions ? "ซ่อน" : "แสดง"} Auto Decision Details</button>
+        {showDecisions ? <div className="mt-3 max-h-40 space-y-2 overflow-auto rounded-xl border border-white/10 bg-white/5 p-3">{Object.values(project.answers).filter((answer) => answer.selectionMode === "auto").map((answer) => <div key={answer.stepId} className="text-xs text-slate-300"><span className="font-bold text-blue-200">{answer.stepId} · {answer.autoConfidence ?? "low"}</span><p className="mt-0.5">{answer.autoReason ?? "กำลังประเมิน"}</p></div>)}</div> : null}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">

@@ -1,5 +1,6 @@
 import { workflowStepById } from "../../data/ai-portrait/workflow.ts"
 import type { PortraitProject } from "../../types/ai-portrait.ts"
+import { effectiveOptionIds } from "./answer-utils.ts"
 
 export type ResolvedAnswer = {
   stepId: string
@@ -15,7 +16,7 @@ export function resolveAnswer(
   const answer = project.answers[stepId]
   if (!step || !answer) return null
 
-  const values = answer.optionIds
+  const values = effectiveOptionIds(answer)
     .map((optionId) => step.options?.find((option) => option.id === optionId)?.promptValue)
     .filter((value): value is string => Boolean(value))
   const customValue = answer.customValue?.trim()

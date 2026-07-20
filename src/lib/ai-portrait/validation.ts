@@ -12,6 +12,8 @@ import type {
   ProjectAnswer,
   WorkflowStep,
 } from "../../types/ai-portrait.ts"
+import { approvalStepIds, effectiveOptionIds } from "./answer-utils.ts"
+import { validateModelSafety } from "./safety-validation.ts"
 
 export type ValidationIssue = {
   code: string
@@ -127,8 +129,9 @@ export function validateStepAnswer(
   if (!answer) return step.required ? ["กรุณาเลือกคำตอบก่อนดำเนินการต่อ"] : []
 
   const customValue = answer.customValue?.trim() ?? ""
-  const selectedOptions = step.options?.filter((option) => answer.optionIds.includes(option.id)) ?? []
-  const hasUnknownOption = answer.optionIds.some(
+  const optionIds = effectiveOptionIds(answer)
+  const selectedOptions = step.options?.filter((option) => optionIds.includes(option.id)) ?? []
+  const hasUnknownOption = optionIds.some(
     (optionId) => !step.options?.some((option) => option.id === optionId),
   )
 
@@ -136,7 +139,7 @@ export function validateStepAnswer(
   if (step.required && selectedOptions.length === 0 && !customValue) {
     errors.push("กรุณาเลือกคำตอบก่อนดำเนินการต่อ")
   }
-  if (answer.optionIds.length > 1 && step.inputType !== "multiselect") {
+  if (optionIds.length > 1 && step.inputType !== "multiselect") {
     errors.push("ขั้นตอนนี้เลือกได้เพียงหนึ่งตัวเลือก")
   }
 
@@ -147,25 +150,13 @@ export function validateStepAnswer(
     errors.push("กรุณากรอกรายละเอียด Custom")
   }
 
-  const approvalStepIds = new Set([
-    "step-2-2",
-    "step-6-2",
-    "step-7-1",
-    "step-7-4",
-    "step-8-3",
-    "step-9-1",
-    "step-9-2",
-    "step-10-1",
-    "step-10-2",
-    "step-10-3",
-  ])
   if (approvalStepIds.has(step.id) && selectedOptions[0]?.code !== "A") {
     errors.push("ขั้นตอนนี้ต้องเลือกตัวเลือกอนุมัติก่อนดำเนินการต่อ")
   }
 
   for (const rule of step.validation ?? []) {
-    if (rule.type === "minSelections" && answer.optionIds.length < rule.value) errors.push(rule.message)
-    if (rule.type === "maxSelections" && answer.optionIds.length > rule.value) errors.push(rule.message)
+    if (rule.type === "minSelections" && optionIds.length < rule.value) errors.push(rule.message)
+    if (rule.type === "maxSelections" && optionIds.length > rule.value) errors.push(rule.message)
     if (rule.type === "minLength" && customValue.length < rule.value) errors.push(rule.message)
     if (rule.type === "maxLength" && customValue.length > rule.value) errors.push(rule.message)
   }
@@ -182,6 +173,9 @@ export function validateProject(project: PortraitProject): ValidationIssue[] {
   }
   for (const stepId of findInvalidatedAnswerStepIds(project)) {
     issues.push({ code: "DEPENDENCY_CONFLICT", id: stepId, message: "คำตอบนี้ไม่สอดคล้องกับคำตอบต้นทางอีกต่อไป" })
+  }
+  for (const issue of validateModelSafety(project)) {
+    issues.push({ code: issue.code, id: issue.stepId, message: issue.message })
   }
   return issues
 }

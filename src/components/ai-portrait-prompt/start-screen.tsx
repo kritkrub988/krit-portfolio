@@ -42,7 +42,7 @@ export function StartScreen({
             <div className="relative mx-auto max-w-md rounded-3xl border border-white/15 bg-white/10 p-5 shadow-2xl backdrop-blur">
               <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-rose-400" /><span className="h-2.5 w-2.5 rounded-full bg-amber-300" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /></div>
               <div className="mt-6 grid gap-3">
-                {['Creative Direction', 'Model Identity', 'Camera + Lighting', 'Film Look', 'Shot List'].map((label, index) => (
+                {['Auto / Model Selection', 'Creative Direction', 'Camera + Lighting', 'Film Look', 'Shot List'].map((label, index) => (
                   <div key={label} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
                     <p className="text-xs font-semibold text-blue-200">STEP {index + 1}</p>
                     <div className="mt-2 flex items-center justify-between"><span className="font-semibold">{label}</span><span className="text-violet-300">⌄</span></div>

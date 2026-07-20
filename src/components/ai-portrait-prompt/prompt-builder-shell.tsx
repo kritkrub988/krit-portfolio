@@ -14,7 +14,10 @@ import {
   workflowStepById,
   workflowSteps,
 } from "@/data/ai-portrait"
-import { deriveSelectedModelId, findInvalidatedAnswerStepIds } from "@/lib/ai-portrait/dependency-rules"
+import { deriveSelectedModelId } from "@/lib/ai-portrait/dependency-rules"
+import { effectiveOptionIds, createInitialAnswer } from "@/lib/ai-portrait/answer-utils"
+import { resolveAllAutomaticAnswers } from "@/lib/ai-portrait/auto-resolution-engine"
+import { validateModelSafety } from "@/lib/ai-portrait/safety-validation"
 import { buildPortraitPrompt } from "@/lib/ai-portrait/prompt-builder"
 import { validateStepAnswer } from "@/lib/ai-portrait/validation"
 import {
@@ -232,7 +235,7 @@ export function PromptBuilderShell({ initialProjectId }: { initialProjectId?: st
     if (!project) return
     const step = workflowStepById.get(answer.stepId)
     const isPostBriefControl = step ? Number(step.phaseId.replace("phase-", "")) >= 10 : false
-    const selectedOption = step?.options?.find((option) => answer.optionIds.includes(option.id))
+    const selectedOption = step?.options?.find((option) => effectiveOptionIds(answer).includes(option.id))
     const selectedModelId = step?.id === "step-2-1"
       ? (typeof selectedOption?.metadata?.modelId === "string" ? selectedOption.metadata.modelId : undefined)
       : project.selectedModelId
@@ -248,18 +251,10 @@ export function PromptBuilderShell({ initialProjectId }: { initialProjectId?: st
       briefApprovedAt: isPostBriefControl ? project.briefApprovedAt : undefined,
       updatedAt: answer.updatedAt,
     }
-    const invalidated = findInvalidatedAnswerStepIds(tentative)
-      .filter((stepId) => stepId !== answer.stepId && Boolean(tentative.answers[stepId]))
-
     const commit = () => {
-      const answers = { ...tentative.answers }
-      for (const stepId of invalidated) delete answers[stepId]
-      const committedProject = {
-        ...tentative,
-        answers,
-        selectedRecipeId: invalidated.includes("step-3-1") ? undefined : tentative.selectedRecipeId,
-      }
+      const { project: committedProject, logs } = resolveAllAutomaticAnswers(tentative, { triggeredBy: answer.stepId })
       scheduleProjectSave(committedProject)
+      void repository().saveAutoDecisionLogs?.(logs).catch((error: unknown) => console.error(error))
       if (
         storageStatus.persistent &&
         step?.id === "step-3-1" &&
@@ -273,16 +268,6 @@ export function PromptBuilderShell({ initialProjectId }: { initialProjectId?: st
       }
     }
 
-    if (invalidated.length > 0) {
-      const labels = invalidated.map((stepId) => workflowStepById.get(stepId)?.code ?? stepId).join(", ")
-      setConfirmation({
-        title: "คำตอบปลายทางไม่สอดคล้องแล้ว",
-        message: `การเปลี่ยนคำตอบนี้จะล้างคำตอบ Step ${labels} ซึ่งขัดกับ Model/Recipe/Capture Medium ใหม่ ต้องการดำเนินการต่อหรือไม่?`,
-        confirmLabel: "เปลี่ยนและล้างคำตอบ",
-        action: commit,
-      })
-      return
-    }
     commit()
   }
 
@@ -313,7 +298,15 @@ export function PromptBuilderShell({ initialProjectId }: { initialProjectId?: st
     const nextStep = workflowSteps[index + 1]
     let nextProject = { ...project }
 
-    if (step.id === "step-9-2" && project.answers[step.id]?.optionIds[0] === "step-9-2:a") {
+    if (["step-9-1", "step-9-2", "step-10-1", "step-10-2", "step-10-3"].includes(step.id)) {
+      const critical = validateModelSafety(project).find((issue) => issue.severity === "critical")
+      if (critical) {
+        setNotice(`Safety Block: ${critical.message}`)
+        return
+      }
+    }
+
+    if (step.id === "step-9-2" && effectiveOptionIds(project.answers[step.id])[0] === "step-9-2:a") {
       nextProject = {
         ...nextProject,
         status: "brief-approved",
@@ -328,7 +321,7 @@ export function PromptBuilderShell({ initialProjectId }: { initialProjectId?: st
       return
     }
 
-    if (step.id === "step-10-3" && project.answers[step.id]?.optionIds[0] === "step-10-3:a") {
+    if (step.id === "step-10-3" && effectiveOptionIds(project.answers[step.id])[0] === "step-10-3:a") {
       nextProject = { ...nextProject, status: "prompt-ready" }
     }
 
@@ -377,7 +370,13 @@ export function PromptBuilderShell({ initialProjectId }: { initialProjectId?: st
       message: "คำตอบและ Brief ปัจจุบันจะถูกล้าง แต่ Prompt Version เดิมจะยังอยู่ใน Version History",
       confirmLabel: "Reset",
       danger: true,
-      action: () => scheduleProjectSave({ ...project, answers: {}, selectedModelId: undefined, selectedRecipeId: undefined, status: "draft", briefApprovedAt: undefined, currentStepId: firstWorkflowStepId, updatedAt: new Date().toISOString() }),
+      action: () => {
+        const timestamp = new Date().toISOString()
+        const base = { ...project, answers: Object.fromEntries(workflowSteps.map((step) => [step.id, createInitialAnswer(step, timestamp)])), selectedModelId: undefined, selectedRecipeId: undefined, status: "draft" as const, briefApprovedAt: undefined, currentStepId: firstWorkflowStepId, updatedAt: timestamp }
+        const { project: resetProject, logs } = resolveAllAutomaticAnswers(base, { triggeredBy: "project-reset" })
+        scheduleProjectSave(resetProject)
+        void repository().saveAutoDecisionLogs?.(logs).catch((error: unknown) => console.error(error))
+      },
     })
   }
 
@@ -422,6 +421,11 @@ export function PromptBuilderShell({ initialProjectId }: { initialProjectId?: st
   }
 
   async function restoreVersion(version: PromptVersion) {
+    const safety = validateModelSafety(version.snapshot).find((issue) => issue.severity === "critical")
+    if (safety) {
+      setNotice(`Restore ถูกปฏิเสธ: ${safety.message}`)
+      return
+    }
     const created = await repository().createProject({ name: `${version.snapshot.name} (Restored V${version.versionNumber.toString().padStart(3, "0")})`, currentStepId: version.snapshot.currentStepId })
     const restored = await repository().updateProject(created.id, {
       answers: structuredClone(version.snapshot.answers),
@@ -484,7 +488,7 @@ export function PromptBuilderShell({ initialProjectId }: { initialProjectId?: st
 
   const currentIndex = workflowSteps.findIndex((step) => step.id === project.currentStepId)
   const currentStep = workflowSteps[currentIndex] ?? workflowSteps[0]
-  const canUseFinal = Boolean(project.briefApprovedAt) && ["brief-approved", "prompt-ready"].includes(project.status)
+  const canUseFinal = Boolean(project.briefApprovedAt) && ["brief-approved", "prompt-ready"].includes(project.status) && !builtPrompt.warnings.some((warning) => warning.severity === "error")
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-slate-50">
@@ -506,7 +510,7 @@ export function PromptBuilderShell({ initialProjectId }: { initialProjectId?: st
       <div className="grid min-h-[calc(100vh-4rem)] grid-cols-1 lg:h-[calc(100vh-4rem)] lg:grid-cols-[280px_minmax(420px,1fr)_minmax(380px,0.9fr)] lg:overflow-hidden">
         <div className={`${sidebarOpen ? "block" : "hidden"} min-w-0 lg:block lg:overflow-hidden`}><WorkflowSidebar project={project} currentStepId={currentStep.id} onNavigate={navigateToStep} /></div>
         <div className="min-w-0 overflow-y-auto"><StepForm project={project} step={currentStep} brief={builtPrompt.brief} canGoPrevious={currentIndex > 0} isLastStep={currentIndex === workflowSteps.length - 1} onChange={applyAnswer} onPrevious={goPrevious} onNext={() => void goNext()} /></div>
-        <div className="min-w-0 lg:overflow-hidden"><LivePromptPreview builtPrompt={builtPrompt} canUseFinal={canUseFinal} saveStatus={saveStatus} versions={versions} highlightedBlock={currentStep.promptBlock} onCopyPrompt={() => void copyText(builtPrompt.fullPrompt, "คัดลอก Final Prompt แล้ว")} onCopyBlock={(content) => void copyText(content, "คัดลอก Prompt Block แล้ว")} onSaveVersion={() => void saveVersion()} onExport={(format) => void exportCurrent(format)} onReset={askReset} onCopyVersion={(version) => void copyText(version.promptText, `คัดลอก Version ${version.versionNumber.toString().padStart(3, "0")} แล้ว`)} onExportVersion={exportVersion} onRestoreVersion={(version) => void restoreVersion(version)} onDeleteVersion={askDeleteVersion} /></div>
+        <div className="min-w-0 lg:overflow-hidden"><LivePromptPreview builtPrompt={builtPrompt} project={project} canUseFinal={canUseFinal} saveStatus={saveStatus} versions={versions} highlightedBlock={currentStep.promptBlock} onCopyPrompt={() => void copyText(builtPrompt.fullPrompt, "คัดลอก Final Prompt แล้ว")} onCopyBlock={(content) => void copyText(content, "คัดลอก Prompt Block แล้ว")} onSaveVersion={() => void saveVersion()} onExport={(format) => void exportCurrent(format)} onReset={askReset} onCopyVersion={(version) => void copyText(version.promptText, `คัดลอก Version ${version.versionNumber.toString().padStart(3, "0")} แล้ว`)} onExportVersion={exportVersion} onRestoreVersion={(version) => void restoreVersion(version)} onDeleteVersion={askDeleteVersion} /></div>
       </div>
 
       <ConfirmDialog open={Boolean(confirmation)} title={confirmation?.title ?? "ยืนยัน"} message={confirmation?.message ?? ""} confirmLabel={confirmation?.confirmLabel} danger={confirmation?.danger} onCancel={() => setConfirmation(null)} onConfirm={() => { const action = confirmation?.action; setConfirmation(null); void action?.() }} />

@@ -2,6 +2,7 @@ import { cameraPackageById, portraitModelById } from "../../data/ai-portrait/mod
 import { lookRecipeById } from "../../data/ai-portrait/recipes.ts"
 import { workflowStepById, workflowSteps } from "../../data/ai-portrait/workflow.ts"
 import type { PortraitProject, WorkflowOption } from "../../types/ai-portrait.ts"
+import { effectiveOptionIds } from "./answer-utils.ts"
 
 export type OptionAvailability = {
   disabled: boolean
@@ -13,6 +14,8 @@ const modelRecipeBlocks: Record<string, string[]> = {
   MODEL_B_MEI: ["PR-02", "PR-03", "PR-04", "PR-08", "PR-15", "PR-16"],
   MODEL_C_RIN: ["PR-02", "PR-03", "PR-04", "PR-08", "PR-09", "PR-11", "PR-13", "PR-15", "PR-16"],
   MODEL_D_HANA: ["PR-03", "PR-05", "PR-06", "PR-09", "PR-11", "PR-12", "PR-13", "PR-14"],
+  MODEL_E_AKARI: ["PR-05", "PR-06", "PR-07", "PR-10", "PR-11", "PR-12", "PR-13", "PR-14", "PR-15", "PR-16"],
+  MODEL_F_HAEUN: ["PR-02", "PR-05", "PR-06", "PR-09", "PR-11", "PR-12", "PR-14", "PR-15", "PR-16"],
 }
 
 function getMetadataString(option: WorkflowOption, key: string): string | undefined {
@@ -22,7 +25,7 @@ function getMetadataString(option: WorkflowOption, key: string): string | undefi
 
 function getSelectedOption(project: PortraitProject, stepId: string): WorkflowOption | undefined {
   const answer = project.answers[stepId]
-  const optionId = answer?.optionIds[0]
+  const optionId = effectiveOptionIds(answer)[0]
   return workflowStepById.get(stepId)?.options?.find((option) => option.id === optionId)
 }
 
@@ -71,14 +74,19 @@ export function getOptionAvailability(
     const blockedHair: Record<string, string[]> = {
       MODEL_A_YUNA: ["E"],
       MODEL_D_HANA: ["E", "F"],
+      MODEL_E_AKARI: ["C", "E"],
     }
     if (blockedHair[modelId]?.includes(option.code)) {
       return { disabled: true, reason: "ทรงผมนี้ไม่ได้รับอนุมัติใน Model Bible ของ Model ที่เลือก" }
     }
   }
 
-  if (stepId === "step-5-4" && modelId === "MODEL_A_YUNA" && ["C", "D", "E"].includes(option.code)) {
-    return { disabled: true, reason: "YUNA ต้องใช้ Makeup เบาและคงภาพลักษณ์วัย 19 ปี" }
+  if (stepId === "step-5-4" && ["MODEL_A_YUNA", "MODEL_E_AKARI"].includes(modelId ?? "") && ["C", "D", "E"].includes(option.code)) {
+    return { disabled: true, reason: "YUNA/AKARI ต้องใช้ Makeup เบาและเหมาะสมกับวัย" }
+  }
+
+  if (stepId === "step-5-1" && modelId === "MODEL_E_AKARI" && ["D", "E", "I"].includes(option.code)) {
+    return { disabled: true, reason: "AKARI เป็นผู้เยาว์ จึงใช้ได้เฉพาะ wardrobe ที่ family-safe และไม่ทำให้ดูเป็นผู้ใหญ่" }
   }
 
   if (stepId === "step-7-2") {
@@ -110,7 +118,7 @@ export function findInvalidatedAnswerStepIds(
   return workflowSteps.flatMap((step) => {
     const answer = project.answers[step.id]
     if (!answer) return []
-    const invalid = answer.optionIds.some((optionId) => {
+    const invalid = effectiveOptionIds(answer).some((optionId) => {
       const option = step.options?.find((item) => item.id === optionId)
       return option ? getOptionAvailability(project, step.id, option).disabled : true
     })

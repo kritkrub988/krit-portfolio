@@ -16,6 +16,10 @@ import {
   getBangkokDateForFilename,
 } from "../src/lib/ai-portrait/ids.ts"
 import { recommendRecipes } from "../src/lib/ai-portrait/recommendation-engine.ts"
+import { resolveAllAutomaticAnswers } from "../src/lib/ai-portrait/auto-resolution-engine.ts"
+import { effectiveOptionIds, normalizeProjectAnswer } from "../src/lib/ai-portrait/answer-utils.ts"
+import { validateImportedPortraitProject, validateModelSafety } from "../src/lib/ai-portrait/safety-validation.ts"
+import { migrateV1AnswerRecord } from "../src/services/portrait-storage/indexed-db.ts"
 import {
   validateMasterData,
   validateStepAnswer,
@@ -43,7 +47,9 @@ function optionId(stepId: string, code: string): string {
 function answer(stepId: string, code: string, customValue?: string): ProjectAnswer {
   return {
     stepId,
-    optionIds: [optionId(stepId, code)],
+    selectionMode: customValue ? "custom" : "manual",
+    selectedOptionIds: [optionId(stepId, code)],
+    resolvedOptionIds: [optionId(stepId, code)],
     customValue,
     updatedAt: "2026-07-20T00:00:00.000Z",
   }
@@ -167,7 +173,7 @@ test("memory repository supports create, save, reload, version, approval invalid
   })
   await repository.saveAnswer(project.id, answer("step-0-1", "B"))
   const reloaded = await repository.getProject(project.id)
-  assert.equal(reloaded?.answers["step-0-1"].optionIds[0], "step-0-1:b")
+  assert.equal(effectiveOptionIds(reloaded?.answers["step-0-1"])[0], "step-0-1:b")
   assert.equal(reloaded?.status, "draft")
   assert.equal(reloaded?.briefApprovedAt, undefined)
 
@@ -192,16 +198,100 @@ test("memory repository supports create, save, reload, version, approval invalid
   assert.equal((await repository.listPromptVersions(project.id)).length, 0)
 })
 
-test("IndexedDB schema v1 declares all required stores", () => {
-  assert.equal(PORTRAIT_DB_VERSION, 1)
+test("IndexedDB schema v2 declares all required stores", () => {
+  assert.equal(PORTRAIT_DB_VERSION, 2)
   assert.deepEqual(Object.values(PORTRAIT_STORES).sort(), [
     "answers",
     "customRecipes",
+    "decisionLogs",
     "exportHistory",
     "projects",
     "promptVersions",
     "settings",
   ])
+})
+
+test("V1 answers migrate to manual while empty answers migrate to auto", () => {
+  const populated = migrateV1AnswerRecord({ stepId: "step-0-1", optionIds: ["step-0-1:b"], updatedAt: "2026-01-01T00:00:00.000Z" })
+  const empty = migrateV1AnswerRecord({ stepId: "step-0-2", optionIds: [], updatedAt: "2026-01-01T00:00:00.000Z" })
+  assert.equal(populated.selectionMode, "manual")
+  assert.deepEqual(populated.selectedOptionIds, populated.resolvedOptionIds)
+  assert.equal(empty.selectionMode, "auto")
+  assert.deepEqual(empty.resolvedOptionIds, [])
+  assert.equal(normalizeProjectAnswer("step-0-1", populated).selectionMode, "manual")
+})
+
+test("new project auto resolution starts model-first with YUNA and never auto-approves", () => {
+  const project = createProject()
+  const resolved = resolveAllAutomaticAnswers(project, { triggeredBy: "test" }).project
+  assert.equal(firstWorkflowStepId, "step-2-1")
+  assert.equal(resolved.selectedModelId, "MODEL_A_YUNA")
+  assert.equal(resolved.answers["step-2-1"].selectionMode, "auto")
+  assert.deepEqual(effectiveOptionIds(resolved.answers["step-2-2"]), [])
+  assert.equal(resolved.answers["step-2-2"].selectionMode, "manual")
+})
+
+test("auto model recalculates from goal while manual and custom answers remain unchanged", () => {
+  const initial = resolveAllAutomaticAnswers(createProject()).project
+  initial.answers["step-0-1"] = answer("step-0-1", "D")
+  initial.answers["step-0-2"] = { ...answer("step-0-2", "G", "Korean university campus audience"), selectionMode: "custom" }
+  const manualBefore = structuredClone(initial.answers["step-0-1"])
+  const customBefore = structuredClone(initial.answers["step-0-2"])
+  const resolved = resolveAllAutomaticAnswers(initial, { triggeredBy: "step-0-2" }).project
+  assert.equal(resolved.selectedModelId, "MODEL_F_HAEUN")
+  assert.deepEqual(resolved.answers["step-0-1"], manualBefore)
+  assert.deepEqual(resolved.answers["step-0-2"], customBefore)
+})
+
+test("switching a previously selected model back to auto does not make that model sticky", () => {
+  const project = resolveAllAutomaticAnswers(createProject()).project
+  project.selectedModelId = "MODEL_F_HAEUN"
+  project.answers["step-2-1"] = {
+    ...project.answers["step-2-1"],
+    resolvedOptionIds: ["step-2-1:f"],
+    autoReason: "Previous automatic model",
+  }
+  project.answers["step-0-1"] = answer("step-0-1", "D")
+
+  const resolved = resolveAllAutomaticAnswers(project, { triggeredBy: "step-0-1" }).project
+
+  assert.equal(resolved.selectedModelId, "MODEL_B_MEI")
+  assert.deepEqual(effectiveOptionIds(resolved.answers["step-2-1"]), ["step-2-1:b"])
+})
+
+test("adult or sensual signal cannot auto-select AKARI", () => {
+  const project = createProject({ answers: { "step-0-1": { ...answer("step-0-1", "J", "sensual school fashion"), selectionMode: "custom" } } })
+  const resolved = resolveAllAutomaticAnswers(project).project
+  assert.notEqual(resolved.selectedModelId, "MODEL_E_AKARI")
+})
+
+test("AKARI minor sexualization and age-up bypass are hard-blocked", () => {
+  const project = createProject({
+    selectedModelId: "MODEL_E_AKARI",
+    answers: {
+      "step-2-1": answer("step-2-1", "E"),
+      "step-5-1": { ...answer("step-5-1", "J", "sensual lingerie, make her older, body focus on thighs"), selectionMode: "custom" },
+    },
+  })
+  const codes = validateModelSafety(project).map((issue) => issue.code)
+  assert.ok(codes.includes("MINOR_SEXUALIZATION"))
+  assert.ok(codes.includes("MINOR_AGE_UP_BYPASS"))
+  assert.equal(validateImportedPortraitProject(project).valid, false)
+})
+
+test("HAEUN age-down, body exaggeration, and whitening imports are rejected", () => {
+  const project = createProject({
+    selectedModelId: "MODEL_F_HAEUN",
+    answers: {
+      "step-2-1": answer("step-2-1", "F"),
+      "step-5-1": { ...answer("step-5-1", "J", "make her younger, high-school look, extremely thin tiny waist, artificial whitening"), selectionMode: "custom" },
+    },
+  })
+  const codes = validateModelSafety(project).map((issue) => issue.code)
+  assert.ok(codes.includes("HAEUN_AGE_DOWN"))
+  assert.ok(codes.includes("BODY_EXAGGERATION"))
+  assert.ok(codes.includes("ARTIFICIAL_WHITENING"))
+  assert.equal(validateImportedPortraitProject(project).valid, false)
 })
 
 test("required MEI Social Content scenario produces a complete coherent 8-shot prompt", () => {

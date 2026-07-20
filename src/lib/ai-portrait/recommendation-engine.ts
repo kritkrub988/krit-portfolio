@@ -2,6 +2,7 @@ import { lookRecipes } from "../../data/ai-portrait/recipes.ts"
 import { workflowStepById } from "../../data/ai-portrait/workflow.ts"
 import { deriveSelectedModelId, isRecipeCompatibleWithModel } from "./dependency-rules.ts"
 import type { LookRecipe, PortraitProject, WorkflowOption } from "../../types/ai-portrait.ts"
+import { effectiveOptionIds } from "./answer-utils.ts"
 
 export type RecipeRecommendation = {
   recipe: LookRecipe
@@ -11,7 +12,7 @@ export type RecipeRecommendation = {
 
 function selectedValue(project: PortraitProject, stepId: string): string | undefined {
   const answer = project.answers[stepId]
-  const optionId = answer?.optionIds[0]
+  const optionId = effectiveOptionIds(answer)[0]
   const option = workflowStepById.get(stepId)?.options?.find((item) => item.id === optionId)
   return answer?.customValue?.trim() || option?.promptValue
 }

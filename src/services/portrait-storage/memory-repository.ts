@@ -1,14 +1,19 @@
 import { createPortraitId } from "../../lib/ai-portrait/ids.ts"
+import { resolveAllAutomaticAnswers } from "../../lib/ai-portrait/auto-resolution-engine.ts"
+import { createInitialAnswer, normalizePortraitProject } from "../../lib/ai-portrait/answer-utils.ts"
+import { workflowSteps } from "../../data/ai-portrait/workflow.ts"
 import type {
   CreateProjectInput,
   PortraitProject,
   PortraitProjectRepository,
   ProjectAnswer,
   PromptVersion,
+  AutoDecisionLog,
 } from "../../types/ai-portrait.ts"
 
 const projects = new Map<string, PortraitProject>()
 const versions = new Map<string, PromptVersion>()
+const decisionLogs = new Map<string, AutoDecisionLog>()
 
 function copyProject(project: PortraitProject): PortraitProject {
   return structuredClone(project)
@@ -17,22 +22,24 @@ function copyProject(project: PortraitProject): PortraitProject {
 export class MemoryPortraitProjectRepository implements PortraitProjectRepository {
   async createProject(input: CreateProjectInput): Promise<PortraitProject> {
     const timestamp = new Date().toISOString()
-    const project: PortraitProject = {
+    const base: PortraitProject = {
       id: createPortraitId("memory_portrait"),
       name: input.name?.trim() || "Untitled Portrait Project",
       status: "draft",
       currentStepId: input.currentStepId,
-      answers: {},
+      answers: Object.fromEntries(workflowSteps.map((step) => [step.id, createInitialAnswer(step, timestamp)])),
       createdAt: timestamp,
       updatedAt: timestamp,
     }
+    const { project, logs } = resolveAllAutomaticAnswers(base, { triggeredBy: "project-created" })
+    for (const log of logs) decisionLogs.set(log.id, log)
     projects.set(project.id, project)
     return copyProject(project)
   }
 
   async getProject(id: string): Promise<PortraitProject | null> {
     const project = projects.get(id)
-    return project ? copyProject(project) : null
+    return project ? copyProject(resolveAllAutomaticAnswers(normalizePortraitProject(project), { triggeredBy: "project-opened" }).project) : null
   }
 
   async listProjects(): Promise<PortraitProject[]> {
@@ -89,5 +96,13 @@ export class MemoryPortraitProjectRepository implements PortraitProjectRepositor
 
   async deletePromptVersion(versionId: string): Promise<void> {
     versions.delete(versionId)
+  }
+
+  async saveAutoDecisionLogs(logs: AutoDecisionLog[]): Promise<void> {
+    for (const log of logs) decisionLogs.set(log.id, structuredClone(log))
+  }
+
+  async listAutoDecisionLogs(projectId: string): Promise<AutoDecisionLog[]> {
+    return [...decisionLogs.values()].filter((log) => log.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((log) => structuredClone(log))
   }
 }
