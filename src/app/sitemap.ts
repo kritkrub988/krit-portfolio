@@ -8,6 +8,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/tutor/course", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/tutor/pricing", changeFrequency: "monthly" as const, priority: 0.8 },
     { path: "/tutor/booking", changeFrequency: "weekly" as const, priority: 0.9 },
+    { path: "/projects/ai-portrait-prompt-lite", changeFrequency: "monthly" as const, priority: 0.8 },
   ]
   return routes.map((route) => ({
     url: `${siteConfig.url}${route.path}`,

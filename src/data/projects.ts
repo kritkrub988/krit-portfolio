@@ -38,6 +38,17 @@ export const projects: Project[] = [
       "A foundation for practical AI agents and digital workflows, designed to bring reusable automation and knowledge tools into one ecosystem.",
   },
   {
+    title: "AI Portrait Prompt — Lite",
+    subtitle: "Portrait Prompt Generator",
+    description:
+      "ระบบสร้าง Prompt สำหรับภาพ Portrait เลือก Model ชุด สถานที่ Mood กล้อง และโทนฟิล์มได้ในหน้าเดียว",
+    image: "/projects/ai-portrait-prompt-lite.webp",
+    technologies: ["Next.js", "TypeScript", "Browser-only"],
+    overview:
+      "เครื่องมือสร้าง Prompt ภาพ Portrait แบบหน้าเดียว พร้อมตัวเลือกที่ใช้ง่าย การแสดงผลแบบเรียลไทม์ การคัดลอก และส่งออกไฟล์ TXT",
+    href: "/projects/ai-portrait-prompt-lite",
+  },
+  {
     title: "Dashboard Demo",
     description: "Analytics & Insights",
     image: "/images/projects/dashboard-demo.webp",
