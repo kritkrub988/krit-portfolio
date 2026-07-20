@@ -10,6 +10,7 @@ import type {
   ExportHistoryRecord,
   PortraitProject,
 } from "@/types/ai-portrait"
+import { resolveImageRatio } from "@/lib/ai-portrait/image-ratio"
 
 export type PromptExportFormat = "txt" | "md" | "json"
 
@@ -28,10 +29,12 @@ export function preparePromptExport(input: {
   timestamp?: string
 }): PreparedPromptExport {
   const timestamp = input.timestamp ?? input.project.updatedAt
+  const imageRatio = resolveImageRatio(input.project)
   const filename = createPromptFilename({
     date: getBangkokDateForFilename(timestamp),
     projectName: input.project.name,
     modelName: input.modelName,
+    imageRatio: imageRatio.primary,
     versionNumber: input.versionNumber,
     extension: input.format,
   })

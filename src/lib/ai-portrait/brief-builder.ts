@@ -1,6 +1,7 @@
 import { workflowStepById } from "../../data/ai-portrait/workflow.ts"
 import type { PortraitProject } from "../../types/ai-portrait.ts"
 import { effectiveOptionIds } from "./answer-utils.ts"
+import { resolveImageRatio } from "./image-ratio.ts"
 
 export type ResolvedAnswer = {
   stepId: string
@@ -58,15 +59,30 @@ const briefFields: Array<[string, string]> = [
   ["Film / Simulation", "step-7-2"],
   ["Post Grade", "step-7-3"],
   ["Color Approval", "step-7-4"],
+  ["Image Ratio", "image-ratio"],
   ["Shot Coverage", "step-8-1"],
   ["Shot Cards", "step-8-2"],
   ["Continuity", "step-8-3"],
 ]
 
 export function buildPortraitBrief(project: PortraitProject): string {
-  const lines = briefFields.map(([label, stepId]) => {
+  const ratio = resolveImageRatio(project)
+  const lines = briefFields.flatMap(([label, stepId]) => {
+    if (stepId === "image-ratio") {
+      return [
+        `- **Primary Ratio:** ${ratio.primary}`,
+        `- **Secondary Ratios:** ${ratio.secondary.join(", ") || "None"}`,
+        `- **Orientation:** ${ratio.orientation}`,
+        `- **Platform Fit:** ${ratio.platformFit.join(", ")}`,
+        `- **Pixel Reference:** ${ratio.pixelReference}`,
+        `- **Composition Guidance:** ${ratio.compositionGuidance.join("; ")}`,
+        `- **Safe Zone:** ${ratio.safeZone}`,
+        `- **Crop Strategy:** ${ratio.cropStrategy}`,
+        `- **Copy Space:** ${ratio.copySpace}`,
+      ]
+    }
     const value = stepId === "project-name" ? project.name : answerValue(project, stepId)
-    return `- **${label}:** ${value}`
+    return [`- **${label}:** ${value}`]
   })
 
   return ["# FINAL PRODUCTION BRIEF", "", ...lines].join("\n")

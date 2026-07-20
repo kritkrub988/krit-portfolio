@@ -4,6 +4,8 @@ import {
   PORTRAIT_STORES,
   type PortraitStoreName,
 } from "./types.ts"
+import type { PortraitProject, ProjectAnswer } from "../../types/ai-portrait.ts"
+import { IMAGE_RATIO_STEP_ID } from "../../lib/ai-portrait/image-ratio.ts"
 
 let databasePromise: Promise<IDBDatabase> | null = null
 
@@ -34,6 +36,19 @@ export function migrateV1AnswerRecord<T extends { optionIds?: string[]; stepId: 
     selectedOptionIds: optionIds.length > 0 ? [...optionIds] : [],
     resolvedOptionIds: [...optionIds],
   }
+}
+
+export function migrateV2ProjectWithImageRatio<T extends { answers?: Record<string, ProjectAnswer>; updatedAt: string }>(project: T): T & { answers: Record<string, ProjectAnswer> } {
+  if (project.answers?.[IMAGE_RATIO_STEP_ID]) return project as T & { answers: Record<string, ProjectAnswer> }
+  const ratioAnswer: ProjectAnswer = {
+    stepId: IMAGE_RATIO_STEP_ID,
+    selectionMode: "auto",
+    selectedOptionIds: [],
+    resolvedOptionIds: [],
+    imageRatio: { secondary: [] },
+    updatedAt: project.updatedAt,
+  }
+  return { ...project, answers: { ...(project.answers ?? {}), [IMAGE_RATIO_STEP_ID]: ratioAnswer } }
 }
 
 function migrateDatabase(database: IDBDatabase, transaction: IDBTransaction, oldVersion: number): void {
@@ -90,13 +105,37 @@ function migrateDatabase(database: IDBDatabase, transaction: IDBTransaction, old
               migrateV1AnswerRecord({ ...(raw as Record<string, unknown>), stepId, updatedAt: (raw as { updatedAt?: string }).updatedAt ?? project.updatedAt }),
             ]),
           )
-          cursor.update({ ...project, answers })
+          const migrated = migrateV2ProjectWithImageRatio({ ...project, answers })
+          cursor.update(migrated)
+          transaction.objectStore(PORTRAIT_STORES.answers).put({
+            id: `${project.id}:${IMAGE_RATIO_STEP_ID}`,
+            projectId: project.id,
+            ...migrated.answers[IMAGE_RATIO_STEP_ID],
+          })
         }
         cursor.continue()
       }
     }
     migrateCursor(PORTRAIT_STORES.answers)
     migrateCursor(PORTRAIT_STORES.projects)
+  }
+
+  if (oldVersion >= 2 && oldVersion < 3) {
+    const projects = transaction.objectStore(PORTRAIT_STORES.projects)
+    const answers = transaction.objectStore(PORTRAIT_STORES.answers)
+    const request = projects.openCursor()
+    request.onsuccess = () => {
+      const cursor = request.result
+      if (!cursor) return
+      const migrated = migrateV2ProjectWithImageRatio(cursor.value as PortraitProject)
+      cursor.update(migrated)
+      answers.put({
+        id: `${migrated.id}:${IMAGE_RATIO_STEP_ID}`,
+        projectId: migrated.id,
+        ...migrated.answers[IMAGE_RATIO_STEP_ID],
+      })
+      cursor.continue()
+    }
   }
 
   void transaction

@@ -7,6 +7,9 @@ import { validateStepAnswer } from "@/lib/ai-portrait/validation"
 import { approvalStepIds, effectiveOptionIds } from "@/lib/ai-portrait/answer-utils"
 import { ModelDetailCard } from "@/components/ai-portrait-prompt/model-detail-card"
 import { RecipeDetailCard } from "@/components/ai-portrait-prompt/recipe-detail-card"
+import { ImageRatioFields } from "@/components/ai-portrait-prompt/image-ratio-fields"
+import { ShotRatioOverrideEditor } from "@/components/ai-portrait-prompt/shot-ratio-override-editor"
+import { IMAGE_RATIO_STEP_ID } from "@/lib/ai-portrait/image-ratio"
 import type { PortraitProject, ProjectAnswer, WorkflowStep } from "@/types/ai-portrait"
 
 type StepFormProps = {
@@ -52,13 +55,14 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
       customValue,
       autoReason: answer?.autoReason,
       autoConfidence: answer?.autoConfidence,
+      imageRatio: answer?.imageRatio,
       updatedAt: new Date().toISOString(),
     })
   }
 
   return (
     <section className="mx-auto w-full max-w-3xl px-5 py-6 sm:px-8 sm:py-8">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Step {step.code}</p>
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Step {step.displayCode ?? step.code}</p>
       <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">{step.title}</h1>
       {step.description ? <p className="mt-3 text-base leading-7 text-slate-600">{step.description}</p> : null}
 
@@ -67,7 +71,7 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
       ) : null}
 
       <div className="mt-7 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        {!approvalStepIds.has(step.id) ? (
+        {step.id !== IMAGE_RATIO_STEP_ID && !approvalStepIds.has(step.id) ? (
           <label htmlFor={`${inputId}-mode`} className="mb-5 block text-sm font-bold text-slate-900">
             Selection Mode
             <select
@@ -91,9 +95,11 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
           </label>
         ) : null}
 
-        {mode !== "auto" ? <span className={`mb-4 inline-flex rounded-full px-2.5 py-1 text-[11px] font-black text-white ${mode === "custom" ? "bg-violet-700" : "bg-slate-700"}`}>{mode.toUpperCase()}</span> : null}
+        {step.id !== IMAGE_RATIO_STEP_ID && mode !== "auto" ? <span className={`mb-4 inline-flex rounded-full px-2.5 py-1 text-[11px] font-black text-white ${mode === "custom" ? "bg-violet-700" : "bg-slate-700"}`}>{mode.toUpperCase()}</span> : null}
 
-        {mode === "auto" ? (
+        {step.id === IMAGE_RATIO_STEP_ID ? (
+          <ImageRatioFields project={project} step={step} answer={answer} onChange={onChange} />
+        ) : mode === "auto" ? (
           <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4" aria-live="polite">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="rounded-full bg-blue-700 px-2.5 py-1 text-[11px] font-black text-white">AUTO</span>
@@ -149,7 +155,7 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
           </div>
         ) : null}
 
-        {mode !== "auto" && selectedOption ? (
+        {step.id !== IMAGE_RATIO_STEP_ID && mode !== "auto" && selectedOption ? (
           <div className="mt-4 rounded-2xl bg-slate-50 p-4">
             <p className="text-xs font-black uppercase tracking-wider text-slate-500">Selected option</p>
             <p className="mt-1 font-bold text-slate-900">{selectedOption.label}</p>
@@ -157,12 +163,14 @@ export function StepForm({ project, step, brief, canGoPrevious, isLastStep, onCh
           </div>
         ) : null}
 
-        {showCustom ? (
+        {step.id !== IMAGE_RATIO_STEP_ID && showCustom ? (
           <label htmlFor={`${inputId}-custom`} className="mt-5 block text-sm font-bold text-slate-900">
             รายละเอียด Custom
             <textarea id={`${inputId}-custom`} value={answer?.customValue ?? ""} onChange={(event) => emit([], event.target.value, "custom")} rows={5} className="mt-2 w-full resize-y rounded-2xl border border-slate-300 px-4 py-3 font-normal outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="ระบุรายละเอียดที่ต้องการ..." />
           </label>
         ) : null}
+
+        {step.id === "step-8-2" ? <ShotRatioOverrideEditor project={project} onChange={onChange} /> : null}
       </div>
 
       {model ? <ModelDetailCard model={model} /> : null}

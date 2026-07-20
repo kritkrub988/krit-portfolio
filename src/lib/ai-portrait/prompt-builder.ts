@@ -6,6 +6,7 @@ import {
   promptBlockOrder,
   promptBlockTitles,
   workflowSteps,
+  imageRatioOptionById,
 } from "../../data/ai-portrait/index.ts"
 import { answerValue, buildPortraitBrief, resolveAnswer } from "./brief-builder.ts"
 import {
@@ -15,8 +16,11 @@ import {
 } from "./dependency-rules.ts"
 import { validateStepAnswer } from "./validation.ts"
 import { validateModelSafety } from "./safety-validation.ts"
+import { resolveImageRatio } from "./image-ratio.ts"
+import { resolveShotDefinitions } from "./shot-planning.ts"
 import type {
   BuiltPrompt,
+  ImageRatioPresetId,
   LookRecipe,
   PortraitModel,
   PortraitProject,
@@ -24,40 +28,6 @@ import type {
   PromptBlockKey,
   PromptWarning,
 } from "../../types/ai-portrait.ts"
-
-const editorialEightShots = [
-  "S01 — Hero Full-body",
-  "S02 — Three-quarter",
-  "S03 — Medium",
-  "S04 — Beauty Close-up",
-  "S05 — Profile",
-  "S06 — Movement",
-  "S07 — Wardrobe Detail",
-  "S08 — Negative-space Cover",
-]
-
-const portraitFiveShots = [
-  "S01 — Hero",
-  "S02 — Medium",
-  "S03 — Close-up",
-  "S04 — Profile",
-  "S05 — Detail",
-]
-
-const campaignTwelveShots = [
-  "S01 — Campaign Hero",
-  "S02 — Vertical Hero",
-  "S03 — Horizontal Hero",
-  "S04 — Full-body",
-  "S05 — Three-quarter",
-  "S06 — Medium",
-  "S07 — Beauty Close-up",
-  "S08 — Profile",
-  "S09 — Movement",
-  "S10 — Product or Wardrobe Detail",
-  "S11 — Horizontal Copy-space",
-  "S12 — Vertical Copy-space",
-]
 
 function modelIdentityContent(model: PortraitModel | null, project: PortraitProject): string {
   if (!model) return "Model identity has not been selected."
@@ -96,22 +66,48 @@ function recipeContent(recipe: LookRecipe | null): string {
 
 function shotListContent(project: PortraitProject): string {
   const coverage = answerValue(project, "step-8-1")
-  const custom = project.answers["step-8-1"]?.customValue?.trim()
-  const shots = coverage.includes("Editorial 8-shot")
-    ? editorialEightShots
-    : coverage.includes("Campaign 12-shot")
-      ? campaignTwelveShots
-      : coverage.includes("Portrait 5-shot")
-        ? portraitFiveShots
-        : custom
-          ? custom.split(/\r?\n/).filter(Boolean)
-          : []
+  const shots = resolveShotDefinitions(project)
+  const imageRatio = resolveImageRatio(project)
 
   if (shots.length === 0) return "Shot coverage has not been completed."
   return [
     `COVERAGE: ${coverage}`,
-    ...shots.map((shot) => `- ${shot}`),
-    "Each shot card must lock purpose, framing, orientation, camera, lens, camera height and distance, aperture, pose, action, expression, eyeline, wardrobe, lighting, background, copy space, and continuity note.",
+    ...shots.flatMap((shot) => {
+      const override = imageRatio.shotOverrides[shot.id]
+      const ratio = override ?? imageRatio.primary
+      const preset = imageRatioOptionById.get(ratio as ImageRatioPresetId)
+      return [
+        `- ${shot.id} — ${shot.label}${override ? " [SHOT RATIO OVERRIDE]" : ""}`,
+        `  aspect_ratio: ${ratio}`,
+        `  orientation: ${preset?.orientation ?? imageRatio.orientation}`,
+        `  pixel_reference: ${preset?.pixelReference ?? imageRatio.pixelReference}`,
+        `  safe_zone: ${preset?.safeZone ?? imageRatio.safeZone}`,
+        `  crop_strategy: ${preset?.cropStrategy ?? imageRatio.cropStrategy}`,
+        `  copy_space: ${preset?.copySpace ?? imageRatio.copySpace}`,
+        ...(imageRatio.secondary.length > 0 ? [`  secondary_ratios: ${imageRatio.secondary.join(", ")}`] : []),
+      ]
+    }),
+    "Each shot card must also lock purpose, framing, camera, lens, camera height and distance, aperture, pose, action, expression, eyeline, wardrobe, lighting, background, and continuity note.",
+  ].join("\n")
+}
+
+function imageFormatContent(project: PortraitProject): string {
+  const ratio = resolveImageRatio(project)
+  return [
+    `SELECTION_MODE: ${ratio.selectionMode.toUpperCase()}`,
+    `ASPECT_RATIO: ${ratio.primary}`,
+    `PRIMARY_RATIO: ${ratio.primary}`,
+    `SECONDARY_RATIOS: ${ratio.secondary.length ? ratio.secondary.join(", ") : "None"}`,
+    `ORIENTATION: ${ratio.orientation}`,
+    `PIXEL_REFERENCE: ${ratio.pixelReference}`,
+    `PLATFORM_FIT: ${ratio.platformFit.join(", ")}`,
+    "COMPOSITION_GUIDANCE:",
+    ...ratio.compositionGuidance.map((guidance) => `- ${guidance}`),
+    `SAFE_ZONE: ${ratio.safeZone}`,
+    `CROP_STRATEGY: ${ratio.cropStrategy}`,
+    `COPY_SPACE: ${ratio.copySpace}`,
+    "HEADROOM_AND_FOOTROOM: Keep both balanced for the selected framing; never crop joints or critical wardrobe details.",
+    ...(ratio.needsDedicatedComposition ? ["MULTI_RATIO_STRATEGY: Create a composition-specific master for each orientation; do not rely on destructive cropping alone."] : []),
   ].join("\n")
 }
 
@@ -154,6 +150,7 @@ function createBlocks(
 
     if (key === "modelIdentity") content = modelIdentityContent(model, project)
     if (key === "lookRecipe") content = recipeContent(recipe)
+    if (key === "imageFormat") content = imageFormatContent(project)
     if (key === "shotPlanning") content = shotListContent(project)
     if (key === "negativeConstraints") content = negativeContent(model, recipe)
     if (key === "productionQa") content = qaContent()
@@ -172,7 +169,7 @@ function buildWarnings(project: PortraitProject): PromptWarning[] {
     if (validateStepAnswer(step, project.answers[step.id]).length > 0) {
       warnings.push({
         code: "INCOMPLETE_REQUIRED_STEP",
-        message: `${step.code} ${step.title} ยังไม่สมบูรณ์`,
+        message: `${step.displayCode ?? step.code} ${step.title} ยังไม่สมบูรณ์`,
         stepId: step.id,
         severity: "warning",
       })
@@ -208,6 +205,7 @@ export function buildPortraitPrompt(
   const blocks = createBlocks(project, model, recipe)
   const warnings = buildWarnings(project)
   const brief = buildPortraitBrief(project)
+  const imageRatio = resolveImageRatio(project)
 
   const sections = [
     ["1. Project Objective", `Project: ${project.name}\nGoal: ${answerValue(project, "step-0-1")}\nProduction Objective: Create a coherent professional portrait image set for the approved goal. Do not create images until this brief is complete and approved.`],
@@ -220,12 +218,13 @@ export function buildPortraitPrompt(
     ["8. Camera and Lens", blockContent(blocks, "cameraPackage")],
     ["9. Lighting Plan", blockContent(blocks, "lightingDesign")],
     ["10. Film / Simulation / Post Grade", blockContent(blocks, "colorPipeline")],
-    ["11. Shot List", blockContent(blocks, "shotPlanning")],
-    ["12. Series Continuity", blockContent(blocks, "continuity")],
-    ["13. Natural Realism Requirements", "Build realism through coherent optics, perspective, anatomy, motivated light, material behavior, authentic skin texture, physically plausible depth of field, and scene logic—not by merely adding the word photorealistic."],
-    ["14. Negative Constraints", blockContent(blocks, "negativeConstraints")],
-    ["15. Professional QA Requirements", blockContent(blocks, "productionQa")],
-    ["16. Output Ratio and Deliverables", blockContent(blocks, "outputRequirements")],
+    ["11. Image Format and Composition", blockContent(blocks, "imageFormat")],
+    ["12. Shot List", blockContent(blocks, "shotPlanning")],
+    ["13. Series Continuity", blockContent(blocks, "continuity")],
+    ["14. Natural Realism Requirements", "Build realism through coherent optics, perspective, anatomy, motivated light, material behavior, authentic skin texture, physically plausible depth of field, and scene logic—not by merely adding the word photorealistic."],
+    ["15. Negative Constraints", blockContent(blocks, "negativeConstraints")],
+    ["16. Professional QA Requirements", blockContent(blocks, "productionQa")],
+    ["17. Output Ratio and Deliverables", `${blockContent(blocks, "outputRequirements")}\nPrimary Ratio: ${imageRatio.primary}\nSecondary Ratios: ${imageRatio.secondary.join(", ") || "None"}\nFilename Token: ${imageRatio.filenameToken}`],
   ] as const
 
   const fullPrompt = [
@@ -244,7 +243,7 @@ export function buildPortraitPrompt(
     brief,
     warnings,
     json: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       generatedAt: project.updatedAt,
       project: {
         name: project.name,
@@ -257,6 +256,7 @@ export function buildPortraitPrompt(
       },
       model,
       recipe,
+      imageRatio,
       promptBlocks: blocks,
       finalPrompt: fullPrompt,
       warnings,

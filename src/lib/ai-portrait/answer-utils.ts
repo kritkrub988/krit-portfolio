@@ -1,4 +1,5 @@
 import type { PortraitProject, ProjectAnswer, WorkflowStep } from "../../types/ai-portrait.ts"
+import { workflowSteps } from "../../data/ai-portrait/workflow.ts"
 
 export const approvalStepIds = new Set([
   "step-2-2", "step-6-2", "step-7-1", "step-7-4", "step-8-3",
@@ -28,19 +29,28 @@ export function normalizeProjectAnswer(
     customValue: answer?.customValue,
     autoReason: answer?.autoReason,
     autoConfidence: answer?.autoConfidence,
+    imageRatio: answer?.imageRatio ? {
+      ...answer.imageRatio,
+      secondary: [...new Set(answer.imageRatio.secondary ?? [])],
+      shotOverrides: answer.imageRatio.shotOverrides ? { ...answer.imageRatio.shotOverrides } : undefined,
+    } : undefined,
     updatedAt: answer?.updatedAt ?? timestamp,
   }
 }
 
 export function normalizePortraitProject(project: PortraitProject): PortraitProject {
+  const normalizedAnswers = Object.fromEntries(
+    Object.entries(project.answers ?? {}).map(([stepId, answer]) => [
+      stepId,
+      normalizeProjectAnswer(stepId, answer, project.updatedAt),
+    ]),
+  )
+  for (const step of workflowSteps) {
+    normalizedAnswers[step.id] ??= createInitialAnswer(step, project.updatedAt)
+  }
   return {
     ...project,
-    answers: Object.fromEntries(
-      Object.entries(project.answers ?? {}).map(([stepId, answer]) => [
-        stepId,
-        normalizeProjectAnswer(stepId, answer, project.updatedAt),
-      ]),
-    ),
+    answers: normalizedAnswers,
   }
 }
 

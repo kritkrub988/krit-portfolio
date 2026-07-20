@@ -9,6 +9,8 @@ import type {
 } from "../../types/ai-portrait.ts"
 import { approvalStepIds, createInitialAnswer, effectiveOptionIds } from "./answer-utils.ts"
 import { getOptionAvailability } from "./dependency-rules.ts"
+import { IMAGE_RATIO_STEP_ID, imageRatioOptionIdByPreset } from "./image-ratio.ts"
+import type { ImageRatioPresetId } from "../../types/ai-portrait.ts"
 
 export type AutoResolutionResult = {
   optionIds: string[]
@@ -91,6 +93,56 @@ function preferredCodes(stepId: string, signals: string): string[] {
   return defaults[stepId] ?? []
 }
 
+function resolveImageRatio(project: PortraitProject): AutoResolutionResult {
+  const signalFor = (stepId: string) => {
+    const answer = project.answers[stepId]
+    const step = workflowStepById.get(stepId)
+    return effectiveOptionIds(answer)
+      .map((id) => step?.options?.find((option) => option.id === id)?.label ?? "")
+      .concat(answer?.customValue ?? "")
+      .join(" ")
+      .toLowerCase()
+  }
+  const platform = signalFor("step-0-3")
+  const deliverables = signalFor("step-0-4")
+  const coverage = signalFor("step-8-1")
+  const goal = signalFor("step-0-1")
+  const narrative = `${signalFor("step-1-1")} ${signalFor("step-1-2")} ${signalFor("step-1-3")}`
+  const combined = `${platform} ${deliverables} ${coverage} ${goal} ${narrative}`
+  let ratio: ImageRatioPresetId = "4:5"
+  let reason = "ใช้ 4:5 เป็นค่าเริ่มต้นที่ยืดหยุ่นสำหรับ Social Feed และงาน Portrait"
+  let confidence: AutoConfidence = "medium"
+
+  if (/story|reel cover|mobile wallpaper/.test(platform)) {
+    ratio = "9:16"; reason = "Platform เป็น Story / Reel Cover จึงใช้กรอบแนวตั้งเต็มจอ 9:16 พร้อม mobile safe zone"; confidence = "high"
+  } else if (/instagram feed|instagram carousel|facebook feed/.test(platform)) {
+    ratio = "4:5"; reason = "Platform เป็น Instagram/Facebook Feed จึงใช้ 4:5 เพื่อใช้พื้นที่หน้าจอแนวตั้งอย่างมีประสิทธิภาพ"; confidence = "high"
+  } else if (/website/.test(platform)) {
+    ratio = "16:9"; reason = "Platform เป็น Website Portfolio/Hero จึงใช้ 16:9 สำหรับ environmental framing และ copy space"; confidence = "high"
+  } else if (/print|poster/.test(platform)) {
+    ratio = "2:3"; reason = "Platform เป็น Print / Poster จึงใช้ 2:3 ซึ่งรองรับ full-body และพื้นที่ตัดตก"; confidence = "high"
+  } else if (/story|reel|mobile/.test(deliverables)) {
+    ratio = "9:16"; reason = "Deliverables เน้น mobile vertical output จึงใช้ 9:16"; confidence = "high"
+  } else if (/poster|full-body|full body/.test(`${deliverables} ${coverage}`)) {
+    ratio = "2:3"; reason = "Deliverables หรือ Shot Coverage เน้น Poster / Full-body จึงใช้ 2:3"; confidence = "high"
+  } else if (/editorial landscape|product \+ model|product and model/.test(combined)) {
+    ratio = "5:4"; reason = "โจทย์เป็น Editorial Landscape หรือ Product + Model จึงใช้ 5:4"; confidence = "high"
+  } else if (/travel|environmental|camera-standard landscape|photo story/.test(combined)) {
+    ratio = "3:2"; reason = "โจทย์เน้น Travel / Environmental Storytelling จึงใช้กรอบกล้องมาตรฐาน 3:2"; confidence = "high"
+  } else if (/profile|social grid|product portrait/.test(combined)) {
+    ratio = "1:1"; reason = "โจทย์เน้น Profile / Social Grid จึงใช้กรอบสี่เหลี่ยม 1:1"; confidence = "high"
+  } else if (/cinematic story|cinematic frame/.test(`${goal} ${narrative}`)) {
+    ratio = "16:9"; reason = "Goal หรือ Narrative เป็น Cinematic Story จึงใช้ 16:9"; confidence = "high"
+  }
+
+  return {
+    optionIds: [imageRatioOptionIdByPreset.get(ratio) ?? imageRatioOptionIdByPreset.get("4:5")!],
+    reason,
+    confidence,
+    warnings: [],
+  }
+}
+
 export function resolveAutomaticAnswer(
   step: WorkflowStep,
   project: PortraitProject,
@@ -101,6 +153,7 @@ export function resolveAutomaticAnswer(
     return { optionIds: [], reason: "Approval ต้องยืนยันโดยผู้ใช้", confidence: "high", warnings: [] }
   }
   if (step.id === "step-2-1") return resolveModel(step, project)
+  if (step.id === IMAGE_RATIO_STEP_ID) return resolveImageRatio(project)
 
   const signals = projectSignals(project)
   const available = (step.options ?? []).filter((option) => !getOptionAvailability(project, step.id, option).disabled)
@@ -142,7 +195,12 @@ export function resolveAllAutomaticAnswers(
   const next = { ...project, answers: { ...project.answers } }
   const logs: AutoDecisionLog[] = []
 
-  for (const step of workflowSteps) {
+  const resolutionOrder = [
+    ...workflowSteps.filter((step) => step.id !== IMAGE_RATIO_STEP_ID),
+    ...workflowSteps.filter((step) => step.id === IMAGE_RATIO_STEP_ID),
+  ]
+
+  for (const step of resolutionOrder) {
     const existing = next.answers[step.id] ?? createInitialAnswer(step, timestamp)
     if (existing.selectionMode !== "auto" || approvalStepIds.has(step.id)) {
       next.answers[step.id] = existing

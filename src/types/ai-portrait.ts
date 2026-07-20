@@ -15,6 +15,7 @@ export type PromptBlockKey =
   | "cameraPackage"
   | "lightingDesign"
   | "colorPipeline"
+  | "imageFormat"
   | "shotPlanning"
   | "continuity"
   | "negativeConstraints"
@@ -57,6 +58,8 @@ export type WorkflowStep = {
   id: string
   phaseId: string
   code: string
+  /** Presentation-only numbering used when stable step IDs must remain unchanged. */
+  displayCode?: string
   title: string
   description?: string
   inputType: InputType
@@ -86,6 +89,43 @@ export type WorkflowDefinition = {
 export type SelectionMode = "auto" | "manual" | "custom"
 export type AutoConfidence = "high" | "medium" | "low"
 
+export type ImageRatioId =
+  | "auto"
+  | "9:16"
+  | "16:9"
+  | "4:5"
+  | "5:4"
+  | "2:3"
+  | "3:2"
+  | "1:1"
+  | "custom"
+
+export type ImageRatioPresetId = Exclude<ImageRatioId, "auto" | "custom">
+
+export type ImageRatioOption = {
+  id: ImageRatioId
+  label: string
+  orientation: "portrait" | "landscape" | "square" | "custom"
+  widthRatio?: number
+  heightRatio?: number
+  description: string
+  recommendedPlatforms: string[]
+  compositionGuidance: string[]
+  promptValue: string
+  pixelReference?: string
+  safeZone: string
+  cropStrategy: string
+  copySpace: string
+}
+
+export type ImageRatioSelection = {
+  primary?: ImageRatioPresetId | string
+  secondary: ImageRatioPresetId[]
+  customWidthRatio?: number
+  customHeightRatio?: number
+  shotOverrides?: Record<string, ImageRatioPresetId>
+}
+
 export type ProjectAnswer = {
   stepId: string
   selectionMode: SelectionMode
@@ -96,6 +136,7 @@ export type ProjectAnswer = {
   customValue?: string
   autoReason?: string
   autoConfidence?: AutoConfidence
+  imageRatio?: ImageRatioSelection
   updatedAt: string
 }
 
@@ -237,14 +278,31 @@ export type PromptWarning = {
 }
 
 export type PortraitPromptExport = {
-  schemaVersion: 2
+  schemaVersion: 3
   generatedAt: string
   project: PortraitProjectSnapshot
   model: PortraitModel | null
   recipe: LookRecipe | null
+  imageRatio: ImageRatioExport
   promptBlocks: PromptBlock[]
   finalPrompt: string
   warnings: PromptWarning[]
+}
+
+export type ImageRatioExport = {
+  selectionMode: SelectionMode
+  primary: string
+  secondary: ImageRatioPresetId[]
+  orientation: "portrait" | "landscape" | "square" | "custom"
+  pixelReference: string
+  platformFit: string[]
+  compositionGuidance: string[]
+  safeZone: string
+  cropStrategy: string
+  copySpace: string
+  shotOverrides: Record<string, ImageRatioPresetId>
+  filenameToken: string
+  shotFilenameTemplate: string
 }
 
 export type BuiltPrompt = {

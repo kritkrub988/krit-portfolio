@@ -25,12 +25,14 @@ export function createPromptFilename(input: {
   date: string
   projectName: string
   modelName?: string
+  imageRatio?: string
   versionNumber: number
   extension: "txt" | "md" | "json"
 }): string {
   const project = slugifyFilenamePart(input.projectName)
   const model = slugifyFilenamePart(input.modelName ?? "NO_MODEL")
-  return `${input.date}_${project}_${model}_PROMPT_${padVersion(input.versionNumber)}.${input.extension}`
+  const ratio = input.imageRatio ? `_${input.imageRatio.replace(/:/g, "x").replace(/[^a-zA-Z0-9x]+/g, "")}` : ""
+  return `${input.date}_${project}_${model}${ratio}_PROMPT_${padVersion(input.versionNumber)}.${input.extension}`
 }
 
 export function getBangkokDateForFilename(isoTimestamp: string): string {

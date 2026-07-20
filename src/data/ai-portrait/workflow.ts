@@ -1,4 +1,5 @@
 import { cameraPackages } from "./models.ts"
+import { imageRatioOptions } from "./image-ratios.ts"
 import { lookRecipes } from "./recipes.ts"
 import type {
   PromptBlockKey,
@@ -38,7 +39,7 @@ function createStep(
   options: OptionInput[],
   config: Partial<WorkflowStep> = {},
 ): WorkflowStep {
-  const id = `step-${code.replace(".", "-")}`
+  const id = config.id ?? `step-${code.replace(".", "-")}`
   return {
     id,
     phaseId,
@@ -333,25 +334,40 @@ const sourcePhases: WorkflowPhase[] = [
     id: "phase-8",
     code: "8",
     title: "Shot Planning",
-    description: "กำหนด Coverage, Shot Cards และ Continuity",
+    description: "กำหนด Image Ratio, Coverage, Shot Cards และ Continuity",
     order: 8,
     steps: [
-      createStep("phase-8", 0, "8.1", "Shot Coverage", "shotPlanning", [
+      createStep("phase-8", 0, "8.R", "สัดส่วนภาพ (Image Ratio)", "imageFormat", [
+        ...imageRatioOptions.map((ratio, index) => ({
+          code: String.fromCharCode(65 + index),
+          label: ratio.label,
+          description: ratio.description,
+          promptValue: ratio.promptValue,
+          metadata: { ratioId: ratio.id },
+        })),
+        { code: "H", label: "Custom Ratio — กำหนดเอง", description: "กำหนด Width Ratio และ Height Ratio แล้วระบบจะย่อเป็นอัตราส่วนอย่างต่ำ" },
+        { code: "I", label: "Multi-ratio Package", description: "กำหนด Primary Ratio หนึ่งค่าและ Secondary Ratios สำหรับชุดส่งออก" },
+      ], {
+        id: "step-8-ratio",
+        displayCode: "8.1",
+        description: "เลือกสัดส่วนภาพให้เหมาะกับช่องทาง การจัดองค์ประกอบ และประเภทงาน ระบบจะนำค่าไปกำหนด Composition, Framing, Copy Space และ Output Requirement",
+      }),
+      createStep("phase-8", 1, "8.1", "Shot Coverage", "shotPlanning", [
         { code: "A", label: "Portrait 5-shot", description: "Hero, Medium, Close-up, Profile, Detail" },
         { code: "B", label: "Editorial 8-shot", description: "Hero Full-body, Three-quarter, Medium, Beauty Close-up, Profile, Movement, Wardrobe Detail, Negative-space Cover" },
         { code: "C", label: "Campaign 12-shot", description: "Hero, Product, Detail, Horizontal, Vertical และ Copy-space" },
         { code: "D", label: "Custom Shot List" },
-      ], { allowsCustom: true }),
-      createStep("phase-8", 1, "8.2", "Shot Cards", "shotPlanning", [
+      ], { allowsCustom: true, displayCode: "8.2" }),
+      createStep("phase-8", 2, "8.2", "Shot Cards", "shotPlanning", [
         { code: "A", label: "สร้าง Shot Cards จาก Coverage", promptValue: "Create a unique shot card for every required frame, including purpose, framing, orientation, camera, lens, camera height and distance, aperture, pose, action, expression, eyeline, wardrobe, lighting, background, copy space, and continuity note" },
         { code: "B", label: "กำหนด Shot Cards เอง" },
-      ], { allowsCustom: true }),
-      createStep("phase-8", 2, "8.3", "Series Continuity", "continuity", [
+      ], { allowsCustom: true, displayCode: "8.3" }),
+      createStep("phase-8", 3, "8.3", "Series Continuity", "continuity", [
         { code: "A", label: "ล็อก Continuity", promptValue: "Lock model identity, wardrobe per look, hair, makeup, accessories, held-object hand, light direction, time, weather, and color pipeline across the series" },
         { code: "B", label: "เปลี่ยน Wardrobe ต่อ Shot" },
         { code: "C", label: "เปลี่ยน Lighting อย่างมีเหตุผล" },
         { code: "D", label: "แก้ Shot List" },
-      ], { inputType: "confirm" }),
+      ], { inputType: "confirm", displayCode: "8.4" }),
     ],
   },
   {
@@ -417,7 +433,7 @@ const phases: WorkflowPhase[] = displayPhaseOrder.map((phaseId, order) => {
 })
 
 export const portraitWorkflow: WorkflowDefinition = {
-  version: "5.1-auto-models",
+  version: "5.2-image-ratio",
   phases,
 }
 

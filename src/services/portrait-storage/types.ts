@@ -7,7 +7,7 @@ export type PortraitStorageStatus = {
 }
 
 export const PORTRAIT_DB_NAME = "krit-ai-portrait"
-export const PORTRAIT_DB_VERSION = 2
+export const PORTRAIT_DB_VERSION = 3
 
 export const PORTRAIT_STORES = {
   projects: "projects",
@@ -30,5 +30,6 @@ export type StoredAnswer = {
   selectedOptionIds: string[]
   resolvedOptionIds: string[]
   customValue?: string
+  imageRatio?: import("@/types/ai-portrait").ImageRatioSelection
   updatedAt: string
 }

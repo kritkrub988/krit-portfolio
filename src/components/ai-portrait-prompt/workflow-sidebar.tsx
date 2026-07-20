@@ -33,7 +33,7 @@ export function WorkflowSidebar({ project, currentStepId, onNavigate }: Workflow
                       className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold transition ${current ? "bg-blue-600 text-white shadow-sm" : complete ? "bg-emerald-50 text-emerald-800 hover:bg-emerald-100" : available ? "text-slate-700 hover:bg-slate-100" : "cursor-not-allowed text-slate-400"}`}
                     >
                       <span aria-hidden="true" className="w-4 text-center">{current ? "●" : complete ? "✓" : available ? "○" : "🔒"}</span>
-                      <span>{step.code} {step.title}</span>
+                  <span>{step.displayCode ?? step.code} {step.title}</span>
                     </button>
                   </li>
                 )
@@ -45,4 +45,3 @@ export function WorkflowSidebar({ project, currentStepId, onNavigate }: Workflow
     </aside>
   )
 }
-

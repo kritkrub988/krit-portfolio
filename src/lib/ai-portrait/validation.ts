@@ -1,5 +1,6 @@
 import {
   cameraPackages,
+  imageRatioOptions,
   lookRecipes,
   portraitModels,
   portraitWorkflow,
@@ -14,6 +15,7 @@ import type {
 } from "../../types/ai-portrait.ts"
 import { approvalStepIds, effectiveOptionIds } from "./answer-utils.ts"
 import { validateModelSafety } from "./safety-validation.ts"
+import { IMAGE_RATIO_STEP_ID, validateImageRatioAnswer } from "./image-ratio.ts"
 
 export type ValidationIssue = {
   code: string
@@ -57,6 +59,7 @@ export function validateMasterData(): ValidationIssue[] {
   const modelIds = portraitModels.map((model) => model.id)
   const recipeIds = lookRecipes.map((recipe) => recipe.id)
   const cameraIds = cameraPackages.map((cameraPackage) => cameraPackage.id)
+  const ratioIds = imageRatioOptions.map((ratio) => ratio.id)
 
   for (const [code, values] of [
     ["DUPLICATE_PHASE_ID", phaseIds],
@@ -65,6 +68,7 @@ export function validateMasterData(): ValidationIssue[] {
     ["DUPLICATE_MODEL_ID", modelIds],
     ["DUPLICATE_RECIPE_ID", recipeIds],
     ["DUPLICATE_CAMERA_ID", cameraIds],
+    ["DUPLICATE_IMAGE_RATIO_ID", ratioIds],
   ] as const) {
     for (const id of duplicateValues(values)) {
       issues.push({ code, id, message: `${code}: ${id}` })
@@ -111,6 +115,15 @@ export function validateMasterData(): ValidationIssue[] {
     }
   }
 
+  for (const ratio of imageRatioOptions) {
+    if (!ratio.widthRatio || !ratio.heightRatio || ratio.widthRatio <= 0 || ratio.heightRatio <= 0) {
+      issues.push({ code: "INVALID_IMAGE_RATIO", id: ratio.id, message: `${ratio.id} ต้องมี widthRatio และ heightRatio เป็นจำนวนบวก` })
+    }
+    if (ratio.compositionGuidance.length === 0 || !ratio.promptValue) {
+      issues.push({ code: "INCOMPLETE_IMAGE_RATIO", id: ratio.id, message: `${ratio.id} ไม่มี composition guidance หรือ prompt value` })
+    }
+  }
+
   const serializedData = JSON.stringify({ portraitModels, lookRecipes, workflow: portraitWorkflow })
   for (const oldName of ["AIRA", "MIRA", "VERA", "ELENA"]) {
     if (serializedData.includes(oldName)) {
@@ -153,6 +166,8 @@ export function validateStepAnswer(
   if (approvalStepIds.has(step.id) && selectedOptions[0]?.code !== "A") {
     errors.push("ขั้นตอนนี้ต้องเลือกตัวเลือกอนุมัติก่อนดำเนินการต่อ")
   }
+
+  if (step.id === IMAGE_RATIO_STEP_ID) errors.push(...validateImageRatioAnswer(answer))
 
   for (const rule of step.validation ?? []) {
     if (rule.type === "minSelections" && optionIds.length < rule.value) errors.push(rule.message)
