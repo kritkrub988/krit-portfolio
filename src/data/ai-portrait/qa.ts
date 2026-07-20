@@ -1,0 +1,14 @@
+import type { QaRule } from "../../types/ai-portrait.ts"
+
+export const portraitQaRules: QaRule[] = [
+  { id: "QA-ID-01", category: "Identity & Age", label: "Lock fictional identity and age", severity: "critical", promptInstruction: "Keep the selected fictional model’s face geometry, age, background, skin undertone, hairline, unique marker, and body silhouette consistent in every shot." },
+  { id: "QA-AN-01", category: "Anatomy & Hands", label: "Natural anatomy and hands", severity: "critical", promptInstruction: "Render anatomically correct limbs, joints, hands, fingers, nails, weight distribution, contact, and movement." },
+  { id: "QA-FC-01", category: "Face, Skin, Hair & Teeth", label: "Texture-preserving facial detail", severity: "quality", promptInstruction: "Preserve pores, age-appropriate skin detail, natural eye direction, plausible catchlights, real teeth, coherent hair strands, and makeup symmetry." },
+  { id: "QA-LT-01", category: "Lighting & Shadow", label: "Coherent motivated lighting", severity: "critical", promptInstruction: "Use one coherent key direction with consistent fill, rim, background light, shadows, catchlights, temperature, and motivated source." },
+  { id: "QA-CM-01", category: "Camera & Perspective", label: "Lens-consistent perspective", severity: "quality", promptInstruction: "Keep focal-length character, camera height and distance, compression, depth of field, focus plane, crop, horizon, and verticals physically consistent." },
+  { id: "QA-WD-01", category: "Wardrobe & Accessories", label: "Wardrobe construction and continuity", severity: "quality", promptInstruction: "Preserve seams, patterns, buttons, zippers, fabric weight and folds, jewelry, shoes, and wardrobe continuity." },
+  { id: "QA-BG-01", category: "Environment, Product & Text", label: "Logical environment and product geometry", severity: "critical", promptInstruction: "Keep architecture, furniture, reflections, vehicles, products, logos, text, signage, scale, weather, and depth logically correct." },
+  { id: "QA-CL-01", category: "Color, Film & Retouch", label: "Separated color pipeline", severity: "quality", promptInstruction: "Treat capture medium, film or simulation, and post grade as separate layers; preserve skin hue, highlight roll-off, shadow detail, spatial grain, and controlled halation." },
+  { id: "QA-CT-01", category: "Series Continuity", label: "Series continuity", severity: "quality", promptInstruction: "Match identity, age, hair, makeup, wardrobe, accessories, light direction, weather, time, color pipeline, grain, aspect strategy, and sequence across the set." },
+  { id: "QA-SF-01", category: "Safety", label: "Fictional and platform-safe", severity: "critical", promptInstruction: "The subject is fictional. Do not imitate a real person, public figure, photographer, or living artist; keep all styling platform-safe and consistent with model restrictions." },
+]
