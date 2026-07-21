@@ -4,6 +4,10 @@ export type PortraitOption = {
   prompt: string
 }
 
+export type PortraitRatioOption = PortraitOption & {
+  resolution: string
+}
+
 export type PortraitFormat = {
   id: string
   label: string

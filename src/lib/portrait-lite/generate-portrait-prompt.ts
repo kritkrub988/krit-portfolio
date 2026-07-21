@@ -20,8 +20,25 @@ The generated person must remain clearly recognizable as the same individual fro
 const identityConsistencyInstruction =
   "Keep the facial identity consistent with the attached reference image in every generated image."
 
-const negativeConstraints =
-  "Avoid identity drift, a different face, a pasted-on face, mismatched head and body, an oversized or undersized head, an elongated neck, narrow or uneven shoulders, a shortened torso, stretched arms or legs, incorrect hip placement, distorted joints, floating feet, missing ground contact, incorrect foot perspective, weak or absent contact shadows, inconsistent cast shadows, mismatched lighting, mismatched sharpness, mismatched grain, incorrect environmental scale, artificial background separation, distorted anatomy, deformed hands, extra fingers, missing fingers, duplicated limbs, excessive facial beautification, plastic skin, text, logos, and watermarks."
+const negativeConstraints = `Avoid identity drift, a different face, a pasted-on face, mismatched head and body, an oversized or undersized head, an elongated neck, narrow or uneven shoulders, a shortened torso, stretched arms or legs, incorrect hip placement, distorted joints, floating feet, missing ground contact, incorrect foot perspective, weak or absent contact shadows, inconsistent cast shadows, mismatched lighting, mismatched sharpness, mismatched grain, incorrect environmental scale, artificial background separation, distorted anatomy, deformed hands, extra fingers, missing fingers, duplicated limbs, excessive facial beautification, plastic skin, text, logos, and watermarks.
+
+Avoid low resolution, blurry facial features, out-of-focus eyes, muddy details, excessive softness, heavy noise, coarse grain, compression artifacts, pixelation, oversharpening, edge halos, excessive skin smoothing, waxy skin, artificial HDR, and loss of detail in highlights or shadows.`
+
+const outputQualityBlock = `Render at the highest native resolution supported by the image generator, with high-resolution photographic detail and clean output suitable for social media and further upscaling.
+
+Keep the eyes and facial features in precise focus. Preserve fine natural detail in the skin, eyelashes, eyebrows, individual hair strands, fabric texture, clothing seams, accessories, and environmental surfaces.
+
+Use clean edge definition, controlled micro-contrast, smooth tonal transitions, accurate highlight detail, and detailed shadows without crushing or artificial sharpening.
+
+Maintain realistic skin texture without excessive smoothing, waxy skin, halos, oversharpening, or an artificial HDR appearance.
+
+Keep film grain subtle and fine so it does not reduce facial clarity or destroy important image detail.`
+
+const headshotDetailInstruction =
+  "For headshots, prioritize precise focus on the eyes, natural eyelashes, eyebrows, skin texture, lips, hairline, and individual hair strands while keeping the result photographic and naturally detailed."
+
+const fullBodyDetailInstruction =
+  "For full-body portraits, maintain clear and recognizable facial detail even when the subject occupies a smaller portion of the frame. Keep the eyes, facial structure, hair, hands, clothing, and footwear clearly resolved without making the face unnaturally sharp compared with the body and environment."
 
 const physicalRealismBlock = `Physical realism and scene integration:
 
@@ -49,7 +66,7 @@ const seatedIndoorRealism = `For seated poses, place the hips naturally on the c
 
 Ensure the arms rest naturally on the table, chair, or body with correct contact points, occlusion, and shadows. Match the chair height, table height, and subject scale realistically.`
 
-function getOption(options: PortraitOption[], id: string, fieldName: string) {
+function getOption<T extends PortraitOption>(options: T[], id: string, fieldName: string): T {
   const option = options.find((item) => item.id === id)
   if (!option) throw new Error(`Unknown portrait ${fieldName}: ${id}`)
   return option
@@ -83,6 +100,11 @@ export function generatePortraitPrompt(selection: PortraitSelection): string {
     details.imageCount.shotVariation,
   ].filter(Boolean).join("\n\n")
   const formatSpecificRealism = details.format.id === "full-body" ? fullBodyRealism : ""
+  const formatSpecificDetail = details.format.id === "headshot"
+    ? headshotDetailInstruction
+    : details.format.id === "full-body"
+      ? fullBodyDetailInstruction
+      : ""
   const locationSpecificInteraction = ["cafe", "home", "bedroom"].includes(details.location.id)
     ? seatedIndoorRealism
     : ""
@@ -109,17 +131,24 @@ ${details.lighting}
 
 ${physicalRealismBlock}
 
-${formatSpecificRealism ? `Format-specific realism:\n${formatSpecificRealism}\n\n` : ""}${locationSpecificInteraction ? `Location-specific interaction:\n${locationSpecificInteraction}\n\n` : ""}
+${formatSpecificRealism ? `Format-specific realism:\n${formatSpecificRealism}\n\n` : ""}${formatSpecificDetail ? `Portrait-format detail preservation:\n${formatSpecificDetail}\n\n` : ""}${locationSpecificInteraction ? `Location-specific interaction:\n${locationSpecificInteraction}\n\n` : ""}
 Camera style:
 ${details.camera.prompt}
 
 Color treatment:
 ${details.film.prompt}
 
+Output quality:
+${outputQualityBlock}
+
 Aspect ratio:
 ${details.ratio.prompt}
 
+Target output resolution:
+${details.ratio.resolution} pixels or the highest supported ${details.ratio.prompt} resolution.
+
 ${identityConsistencyInstruction}
 
+Negative prompt:
 ${negativeConstraints}`
 }

@@ -1,6 +1,7 @@
 import type {
   ImageCountOption,
   PortraitOption,
+  PortraitRatioOption,
   PortraitSelection,
 } from "../../types/portrait-lite.ts"
 
@@ -44,11 +45,11 @@ export const lightingByMood: Record<string, string> = {
   "confident-allure": "soft directional light with elegant shadows, refined contrast, and a sophisticated editorial atmosphere",
 }
 
-export const ratioOptions: PortraitOption[] = [
-  { id: "1:1", label: "1:1 — Profile / Square Post", prompt: "1:1" },
-  { id: "4:5", label: "4:5 — Social Feed", prompt: "4:5" },
-  { id: "9:16", label: "9:16 — Story / Reels", prompt: "9:16" },
-  { id: "16:9", label: "16:9 — Landscape", prompt: "16:9" },
+export const ratioOptions: PortraitRatioOption[] = [
+  { id: "1:1", label: "1:1 — Profile / Square Post", prompt: "1:1", resolution: "2048 × 2048" },
+  { id: "4:5", label: "4:5 — Social Feed", prompt: "4:5", resolution: "2048 × 2560" },
+  { id: "9:16", label: "9:16 — Story / Reels", prompt: "9:16", resolution: "2160 × 3840" },
+  { id: "16:9", label: "16:9 — Landscape", prompt: "16:9", resolution: "3840 × 2160" },
 ]
 
 export const imageCountOptions: ImageCountOption[] = [

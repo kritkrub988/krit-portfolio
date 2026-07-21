@@ -6,6 +6,7 @@ import {
   defaultPortraitSelection,
   imageCountOptions,
   moodOptions,
+  ratioOptions,
 } from "../src/data/portrait-lite/portrait-options.ts"
 import {
   createPortraitExportFilename,
@@ -71,8 +72,11 @@ test("generated prompt follows the required travel section order", () => {
     "Physical realism and scene integration:",
     "Camera style:",
     "Color treatment:",
+    "Output quality:",
     "Aspect ratio:",
+    "Target output resolution:",
     "Keep the facial identity consistent with the attached reference image",
+    "Negative prompt:",
     "Avoid identity drift, a different face, a pasted-on face",
   ]
   let previousIndex = -1
@@ -81,6 +85,59 @@ test("generated prompt follows the required travel section order", () => {
     assert.ok(index > previousIndex, `${section} must appear in the required order`)
     previousIndex = index
   }
+})
+
+test("output quality preserves photographic detail without claiming guaranteed pixels", () => {
+  const prompt = generatePortraitPrompt(defaultPortraitSelection)
+  assert.match(prompt, /Output quality:\nRender at the highest native resolution supported by the image generator/)
+  assert.match(prompt, /eyes and facial features in precise focus/)
+  assert.match(prompt, /individual hair strands, fabric texture, clothing seams/)
+  assert.match(prompt, /controlled micro-contrast, smooth tonal transitions/)
+  assert.match(prompt, /without excessive smoothing, waxy skin, halos, oversharpening/)
+  assert.match(prompt, /film grain subtle and fine/)
+  assert.doesNotMatch(prompt, /guarantee(?:d|s)? \d+|guaranteed pixel/i)
+})
+
+test("target resolution changes with every supported aspect ratio", () => {
+  const expected = new Map([
+    ["1:1", "2048 × 2048"],
+    ["4:5", "2048 × 2560"],
+    ["9:16", "2160 × 3840"],
+    ["16:9", "3840 × 2160"],
+  ])
+
+  for (const ratio of ratioOptions) {
+    assert.equal(ratio.resolution, expected.get(ratio.id))
+    const prompt = generatePortraitPrompt({ ...defaultPortraitSelection, ratioId: ratio.id })
+    assert.match(
+      prompt,
+      new RegExp(`Target output resolution:\\n${ratio.resolution} pixels or the highest supported ${ratio.prompt.replace(":", "\\:")} resolution\\.`),
+    )
+  }
+})
+
+test("headshot and full-body prompts receive their own detail instructions", () => {
+  const headshot = generatePortraitPrompt({ ...defaultPortraitSelection, formatId: "headshot" })
+  assert.match(headshot, /For headshots, prioritize precise focus on the eyes, natural eyelashes, eyebrows, skin texture, lips, hairline, and individual hair strands/)
+  assert.doesNotMatch(headshot, /For full-body portraits, maintain clear and recognizable facial detail/)
+
+  const fullBody = generatePortraitPrompt({ ...defaultPortraitSelection, formatId: "full-body" })
+  assert.match(fullBody, /For full-body portraits, maintain clear and recognizable facial detail even when the subject occupies a smaller portion of the frame/)
+  assert.match(fullBody, /without making the face unnaturally sharp compared with the body and environment/)
+  assert.doesNotMatch(fullBody, /For headshots, prioritize precise focus/)
+
+  for (const formatId of ["half-body", "three-quarter"]) {
+    const prompt = generatePortraitPrompt({ ...defaultPortraitSelection, formatId })
+    assert.doesNotMatch(prompt, /Portrait-format detail preservation:/)
+  }
+})
+
+test("negative prompt includes resolution and detail quality constraints", () => {
+  const prompt = generatePortraitPrompt(defaultPortraitSelection)
+  assert.match(prompt, /Negative prompt:\nAvoid identity drift/)
+  assert.match(prompt, /Avoid low resolution, blurry facial features, out-of-focus eyes, muddy details/)
+  assert.match(prompt, /compression artifacts, pixelation, oversharpening, edge halos/)
+  assert.match(prompt, /waxy skin, artificial HDR, and loss of detail in highlights or shadows/)
 })
 
 test("physical realism and conditional realism blocks follow the selected format and location", () => {
@@ -147,4 +204,7 @@ test("TXT export uses format and location tokens with travel instructions", () =
   assert.match(text, /Film Filter: Portra-inspired/)
   assert.match(text, /วิธีใช้:\nแนบรูปใบหน้าของคุณพร้อม Prompt/)
   assert.match(text, /PROMPT\n-{40}/)
+  assert.match(text, /Output quality:\nRender at the highest native resolution supported by the image generator/)
+  assert.match(text, /Target output resolution:\n2048 × 2560 pixels or the highest supported 4:5 resolution\./)
+  assert.match(text, /Avoid low resolution, blurry facial features, out-of-focus eyes/)
 })
