@@ -62,15 +62,18 @@ test("every prompt starts with reference identity lock and rejects replacement f
 test("generated prompt follows the required travel section order", () => {
   const prompt = generatePortraitPrompt(defaultPortraitSelection)
   const sections = [
+    "Image count:",
     "Portrait format:",
     "Wardrobe:",
     "Travel location:",
     "Mood:",
     "Lighting:",
+    "Physical realism and scene integration:",
     "Camera style:",
     "Color treatment:",
     "Aspect ratio:",
-    "Create one polished travel portrait using the selected portrait format.",
+    "Keep the facial identity consistent with the attached reference image",
+    "Avoid identity drift, a different face, a pasted-on face",
   ]
   let previousIndex = -1
   for (const section of sections) {
@@ -78,6 +81,27 @@ test("generated prompt follows the required travel section order", () => {
     assert.ok(index > previousIndex, `${section} must appear in the required order`)
     previousIndex = index
   }
+})
+
+test("physical realism and conditional realism blocks follow the selected format and location", () => {
+  const fullBodyPrompt = generatePortraitPrompt({
+    ...defaultPortraitSelection,
+    formatId: "full-body",
+    locationId: "cafe",
+  })
+  assert.match(fullBodyPrompt, /Physical realism and scene integration:/)
+  assert.match(fullBodyPrompt, /Format-specific realism:/)
+  assert.match(fullBodyPrompt, /complete body from head to toe without cropping the feet/)
+  assert.match(fullBodyPrompt, /Location-specific interaction:/)
+  assert.match(fullBodyPrompt, /hips naturally on the chair/)
+  assert.match(fullBodyPrompt, /50mm to 85mm equivalent lens/)
+
+  const outdoorPrompt = generatePortraitPrompt({
+    ...defaultPortraitSelection,
+    locationId: "beach",
+  })
+  assert.doesNotMatch(outdoorPrompt, /Format-specific realism:/)
+  assert.doesNotMatch(outdoorPrompt, /Location-specific interaction:/)
 })
 
 test("image counts 1, 2, and 4 respect the selected portrait format", () => {
