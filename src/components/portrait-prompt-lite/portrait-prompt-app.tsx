@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { ArrowLeft, Sparkles } from "lucide-react"
 import { useState } from "react"
-import { ModelSelector } from "@/components/portrait-prompt-lite/model-selector"
+import { PortraitFormatSelector } from "@/components/portrait-prompt-lite/portrait-format-selector"
 import { OptionSelector } from "@/components/portrait-prompt-lite/option-selector"
 import { PromptPreview } from "@/components/portrait-prompt-lite/prompt-preview"
 import {
@@ -44,16 +44,16 @@ export function PortraitPromptApp() {
             </span>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-violet-400">
-                Portrait prompt generator
+                TRAVEL PORTRAIT PROMPT GENERATOR
               </p>
               <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                AI Portrait Prompt — Lite
+                AI Portrait Prompt — เที่ยวทิพย์
               </h1>
               <p className="mt-3 text-base text-slate-300 sm:text-lg">
-                เลือกไม่กี่อย่าง แล้วได้ Prompt พร้อมใช้
+                พร้อมเที่ยวภายใน 10 วินาที
               </p>
               <p className="mt-2 text-sm text-slate-500">
-                ระบบนี้สร้างเฉพาะ Prompt และไม่ได้สร้างภาพภายในเว็บไซต์
+                แนบรูปใบหน้าของคุณพร้อม Prompt เพื่อสร้างภาพท่องเที่ยวในแบบที่ต้องการ
               </p>
             </div>
           </div>
@@ -61,9 +61,9 @@ export function PortraitPromptApp() {
 
         <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)] xl:gap-10">
           <div className="space-y-7 rounded-3xl border border-slate-800 bg-[#0b1628]/85 p-4 shadow-xl shadow-slate-950/20 sm:p-6">
-            <ModelSelector
-              value={selection.modelId}
-              onChange={(value) => updateSelection("modelId", value)}
+            <PortraitFormatSelector
+              value={selection.formatId}
+              onChange={(value) => updateSelection("formatId", value)}
             />
             <OptionSelector heading="Outfit Style" step="02" options={outfitOptions} value={selection.outfitId} onChange={(value) => updateSelection("outfitId", value)} />
             <OptionSelector heading="Location" step="03" options={locationOptions} value={selection.locationId} onChange={(value) => updateSelection("locationId", value)} />

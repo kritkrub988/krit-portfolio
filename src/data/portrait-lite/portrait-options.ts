@@ -56,22 +56,22 @@ export const imageCountOptions: ImageCountOption[] = [
     id: "1",
     label: "1 ภาพ",
     value: 1,
-    prompt: "Create one polished portrait composition.",
-    shotVariation: "Use a polished portrait angle with a natural expression and purposeful composition.",
+    prompt: "Create one polished travel portrait using the selected portrait format.",
+    shotVariation: "",
   },
   {
     id: "2",
     label: "2 ภาพ",
     value: 2,
-    prompt: "Create a cohesive set of 2 portrait photographs:",
-    shotVariation: "1. A medium portrait looking toward the camera.\n2. A candid three-quarter or side-angle portrait.\n\nKeep the model, wardrobe, location, mood, lighting, and color treatment consistent.",
+    prompt: "Create a cohesive set of 2 travel portraits using the selected portrait format:",
+    shotVariation: "1. A composed portrait looking toward the camera.\n2. A more candid portrait using a different camera angle and natural body movement.\n\nKeep the same person, facial identity, wardrobe, destination, mood, lighting, and color treatment consistent.",
   },
   {
     id: "4",
     label: "4 ภาพ",
     value: 4,
-    prompt: "Create a cohesive set of 4 portrait photographs:",
-    shotVariation: "1. A medium portrait looking toward the camera.\n2. A candid side-angle portrait.\n3. A close portrait with a natural expression.\n4. A wider environmental portrait showing more of the location.\n\nKeep the model, wardrobe, location, mood, lighting, and color treatment consistent. Avoid duplicated poses and camera angles.",
+    prompt: "Create a cohesive set of 4 travel portraits using the selected portrait format:",
+    shotVariation: "1. Looking toward the camera with a natural expression.\n2. A candid three-quarter or side angle.\n3. Interacting naturally with the travel environment.\n4. A different composition showing more environmental depth.\n\nKeep the same person, facial identity, wardrobe, destination, mood, lighting, and color treatment consistent. Avoid duplicated poses, expressions, and camera angles.",
   },
 ]
 
@@ -93,7 +93,7 @@ export const filmOptions: PortraitOption[] = [
 ]
 
 export const defaultPortraitSelection: PortraitSelection = {
-  modelId: "akira",
+  formatId: "three-quarter",
   outfitId: "minimal",
   locationId: "studio",
   moodId: "soft-natural",

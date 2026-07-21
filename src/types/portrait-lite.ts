@@ -4,9 +4,11 @@ export type PortraitOption = {
   prompt: string
 }
 
-export type PortraitModel = PortraitOption & {
-  name: string
-  image?: string
+export type PortraitFormat = {
+  id: string
+  label: string
+  description: string
+  prompt: string
 }
 
 export type ImageCountOption = PortraitOption & {
@@ -15,7 +17,7 @@ export type ImageCountOption = PortraitOption & {
 }
 
 export type PortraitSelection = {
-  modelId: string
+  formatId: string
   outfitId: string
   locationId: string
   moodId: string

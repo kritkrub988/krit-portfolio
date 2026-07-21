@@ -1,4 +1,4 @@
-import { portraitModels } from "../../data/portrait-lite/portrait-models.ts"
+import { portraitFormats } from "../../data/portrait-lite/portrait-formats.ts"
 import {
   cameraOptions,
   filmOptions,
@@ -11,8 +11,17 @@ import {
 } from "../../data/portrait-lite/portrait-options.ts"
 import type { PortraitOption, PortraitSelection } from "../../types/portrait-lite.ts"
 
-const negativePrompt =
-  "Avoid changing the model’s facial identity, facial structure, hairstyle, age appearance, skin tone, or natural body proportions. Avoid duplicated poses, distorted anatomy, deformed hands, extra fingers, missing fingers, plastic skin, excessive retouching, exaggerated body features, overly revealing clothing, text, logos, watermarks, low resolution, artificial-looking backgrounds, and inconsistent lighting."
+const identityInstruction = `Use the attached reference photo as the primary identity source for the subject.
+
+Create a realistic travel portrait featuring the same person shown in the reference image. Preserve the person’s original facial identity as closely as possible, including facial structure, face shape, eyes, eyebrows, nose, lips, jawline, skin tone, hairstyle, hairline, age appearance, and recognizable characteristics.
+
+The generated person must remain clearly recognizable as the same individual from the reference photo. Do not replace the subject with a different person, create a look-alike, beautify the face excessively, change ethnicity, alter age, or redesign the facial features.`
+
+const identityConsistencyInstruction =
+  "Keep the facial identity consistent with the attached reference image in every generated image."
+
+const negativeConstraints =
+  "Avoid identity drift, a different face, altered facial proportions, excessive facial beautification, artificial skin, distorted anatomy, unnatural body proportions, deformed hands, extra fingers, missing fingers, duplicated body parts, incorrect perspective, inconsistent lighting, text, logos, and watermarks."
 
 function getOption(options: PortraitOption[], id: string, fieldName: string) {
   const option = options.find((item) => item.id === id)
@@ -21,15 +30,15 @@ function getOption(options: PortraitOption[], id: string, fieldName: string) {
 }
 
 export function getPortraitSelectionDetails(selection: PortraitSelection) {
-  const model = portraitModels.find((item) => item.id === selection.modelId)
-  if (!model) throw new Error(`Unknown portrait model: ${selection.modelId}`)
+  const format = portraitFormats.find((item) => item.id === selection.formatId)
+  if (!format) throw new Error(`Unknown portrait format: ${selection.formatId}`)
 
   const mood = getOption(moodOptions, selection.moodId, "mood")
   const imageCount = imageCountOptions.find((item) => item.id === selection.imageCountId)
   if (!imageCount) throw new Error(`Unknown portrait image count: ${selection.imageCountId}`)
 
   return {
-    model,
+    format,
     outfit: getOption(outfitOptions, selection.outfitId, "outfit"),
     location: getOption(locationOptions, selection.locationId, "location"),
     mood,
@@ -43,16 +52,20 @@ export function getPortraitSelectionDetails(selection: PortraitSelection) {
 
 export function generatePortraitPrompt(selection: PortraitSelection): string {
   const details = getPortraitSelectionDetails(selection)
+  const imageInstruction = [
+    details.imageCount.prompt,
+    details.imageCount.shotVariation,
+  ].filter(Boolean).join("\n\n")
 
-  return `${details.imageCount.prompt}
+  return `${identityInstruction}
 
-Subject:
-${details.model.prompt}
+Portrait format:
+${details.format.prompt}
 
 Wardrobe:
 ${details.outfit.prompt}
 
-Location:
+Travel location:
 ${details.location.prompt}
 
 Mood:
@@ -70,7 +83,9 @@ ${details.film.prompt}
 Aspect ratio:
 ${details.ratio.prompt}
 
-${details.imageCount.shotVariation}
+${imageInstruction}
 
-${negativePrompt}`
+${identityConsistencyInstruction}
+
+${negativeConstraints}`
 }
