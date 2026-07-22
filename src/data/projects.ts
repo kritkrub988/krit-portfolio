@@ -13,15 +13,15 @@ export type Project = {
 export const projects: Project[] = [
   {
     title: "LINE Sticker Prompt Builder",
-    subtitle: "ตัวช่วยสร้าง Prompt สติกเกอร์ไลน์",
+    subtitle: "LINE Sticker Prompt & Studio",
     description:
-      "สร้าง Prompt สติกเกอร์ 16 อารมณ์ เลือกธีม รูปแบบตัวอักษร และข้อความ พร้อมนำไปใช้กับ ChatGPT หรือ Gemini",
+      "สร้าง Prompt ภาพ 16 อารมณ์ ตัดภาพ ลบพื้นหลัง ใส่ข้อความไทย และดาวน์โหลดไฟล์ได้ใน Browser",
     image: "/images/projects/line-sticker-prompt-preview.png",
-    technologies: ["Next.js", "TypeScript", "Prompt Design"],
+    technologies: ["Next.js", "TypeScript", "Canvas", "Browser-only"],
     overview:
-      "เครื่องมือทำงานใน Browser สำหรับเลือกธีม ตัวอักษร และแก้ข้อความ 16 ประโยค พร้อม Copy หรือดาวน์โหลด Prompt โดยไม่เชื่อมต่อ AI API",
+      "Studio ฝั่ง Browser สำหรับสร้าง Prompt ภาพล้วน ตัดตาราง 4×4 ลบพื้นหลังสีเรียบ วางข้อความไทย และ Export PNG/ZIP โดยไม่ส่งรูปขึ้น Server",
     href: "/line-sticker-prompt",
-    ctaLabel: "ลองใช้งาน",
+    ctaLabel: "ลองทำสติกเกอร์",
     imageFit: "contain",
   },
   {

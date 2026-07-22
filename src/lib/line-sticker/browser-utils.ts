@@ -25,6 +25,10 @@ export async function copyTextToClipboard(text: string) {
 
 export function downloadTextFile(filename: string, text: string) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" })
+  downloadBlob(filename, blob)
+}
+
+export function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement("a")
   anchor.href = url
@@ -32,5 +36,5 @@ export function downloadTextFile(filename: string, text: string) {
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
-  URL.revokeObjectURL(url)
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
 }

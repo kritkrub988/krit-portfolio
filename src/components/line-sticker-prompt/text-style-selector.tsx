@@ -42,14 +42,14 @@ export function TextStyleSelector({ value, onChange }: TextStyleSelectorProps) {
     <section aria-labelledby="text-style-heading">
       <div className="mb-5 flex items-start gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-pink-100 text-sm font-extrabold text-pink-700">
-          2
+          Aa
         </span>
         <div>
           <h2 id="text-style-heading" className="text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">
-            เลือกรูปแบบตัวอักษร
+            เลือกรูปแบบตัวอักษรของภาพนี้
           </h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            รูปแบบนี้จะถูกนำไปใช้กับข้อความบนสติกเกอร์ทั้ง 16 ภาพ
+            เลือกจาก 24 แบบ แต่ละภาพเก็บ Style แยกกันและปรับสีหรือขนาดต่อได้
           </p>
         </div>
       </div>

@@ -2,14 +2,13 @@ import type { Metadata } from "next"
 import Footer from "@/components/layout/Footer"
 import Navbar from "@/components/layout/Navbar"
 import { HowToSection } from "@/components/line-sticker-prompt/how-to-section"
-import { SplitPromptSection } from "@/components/line-sticker-prompt/split-prompt-section"
 import { StickerHero } from "@/components/line-sticker-prompt/sticker-hero"
-import { StickerPromptBuilder } from "@/components/line-sticker-prompt/sticker-prompt-builder"
+import { StickerStudio } from "@/components/line-sticker-prompt/sticker-studio"
 
 export const metadata: Metadata = {
-  title: "LINE Sticker Prompt Builder",
+  title: "ตัวช่วยทำสติกเกอร์ไลน์",
   description:
-    "ตัวช่วยสร้าง Prompt สติกเกอร์ไลน์ 16 อารมณ์ เลือกธีม รูปแบบตัวอักษร และข้อความ พร้อมนำไปใช้กับ ChatGPT หรือ Gemini",
+    "สร้าง Prompt ภาพ 16 อารมณ์ ตัดภาพ ลบพื้นหลัง ใส่ข้อความไทย และดาวน์โหลดไฟล์ได้ใน Browser",
 }
 
 export default function LineStickerPromptPage() {
@@ -18,8 +17,7 @@ export default function LineStickerPromptPage() {
       <Navbar homeHrefPrefix="/" />
       <main>
         <StickerHero />
-        <StickerPromptBuilder />
-        <SplitPromptSection />
+        <StickerStudio />
         <HowToSection />
       </main>
       <Footer />
