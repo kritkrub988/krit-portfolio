@@ -1,5 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
+import { ArrowUpRight } from "lucide-react"
 import Container from "@/components/common/Container"
 import MotionWrapper from "@/components/common/MotionWrapper"
 import Section from "@/components/common/Section"
@@ -35,7 +36,7 @@ export default function ProjectsSection() {
                     alt={`${project.title} project concept artwork`}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                    className="object-cover transition duration-500 group-hover:scale-105"
+                    className={`${project.imageFit === "contain" ? "object-contain p-2" : "object-cover"} transition duration-500 group-hover:scale-105`}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/35 to-transparent" />
                 </div>
@@ -53,6 +54,13 @@ export default function ProjectsSection() {
                     <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-500">
                       {project.description}
                     </p>
+                  ) : null}
+
+                  {project.ctaLabel ? (
+                    <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600">
+                      {project.ctaLabel}
+                      <ArrowUpRight size={14} aria-hidden="true" />
+                    </span>
                   ) : null}
                 </div>
               </Card>

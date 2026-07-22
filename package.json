@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --no-warnings --test --experimental-strip-types tests/tutor-booking.test.ts tests/google-apps-script-booking.test.ts tests/ai-portrait-prompt.test.ts tests/ai-portrait-prompt-lite.test.ts"
+    "test": "node --no-warnings --test --experimental-strip-types tests/tutor-booking.test.ts tests/google-apps-script-booking.test.ts tests/ai-portrait-prompt.test.ts tests/ai-portrait-prompt-lite.test.ts tests/line-sticker-prompt.test.ts"
   },
   "dependencies": {
     "framer-motion": "^12.42.2",

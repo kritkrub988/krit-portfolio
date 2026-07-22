@@ -6,8 +6,16 @@ import Container from "@/components/common/Container"
 import Button from "@/components/ui/Button"
 import { navigationItems } from "@/data/navigation"
 
-export default function Navbar() {
+type NavbarProps = {
+  homeHrefPrefix?: string
+}
+
+export default function Navbar({ homeHrefPrefix = "" }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false)
+
+  function resolveHref(href: string) {
+    return homeHrefPrefix && href.startsWith("#") ? `${homeHrefPrefix}${href}` : href
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -24,7 +32,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/85 backdrop-blur-xl">
       <Container>
         <nav className="flex h-20 items-center justify-between lg:h-18">
-          <a href="#home" className="flex items-center gap-3">
+          <a href={resolveHref("#home")} className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-lg font-bold text-blue-600">
               &lt;/&gt;
             </div>
@@ -38,7 +46,7 @@ export default function Navbar() {
             {navigationItems.map((item) => (
               <a
                 key={item.label}
-                href={item.href}
+                href={resolveHref(item.href)}
                 className="text-sm font-semibold text-slate-700 transition hover:text-blue-600"
               >
                 {item.label}
@@ -47,7 +55,7 @@ export default function Navbar() {
           </div>
 
           <div className="hidden lg:block">
-            <Button href="#contact">Contact Me</Button>
+            <Button href={resolveHref("#contact")}>Contact Me</Button>
           </div>
 
           <button
@@ -71,7 +79,7 @@ export default function Navbar() {
               {navigationItems.map((item) => (
                 <a
                   key={item.label}
-                  href={item.href}
+                  href={resolveHref(item.href)}
                   onClick={() => setIsOpen(false)}
                   className="rounded-xl px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-600"
                 >
@@ -80,7 +88,7 @@ export default function Navbar() {
               ))}
 
               <div className="px-4 pt-2">
-                <Button href="#contact">Contact Me</Button>
+                <Button href={resolveHref("#contact")}>Contact Me</Button>
               </div>
             </div>
           </div>

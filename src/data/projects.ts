@@ -6,9 +6,24 @@ export type Project = {
   technologies: string[]
   overview: string
   href?: string
+  ctaLabel?: string
+  imageFit?: "cover" | "contain"
 }
 
 export const projects: Project[] = [
+  {
+    title: "LINE Sticker Prompt Builder",
+    subtitle: "ตัวช่วยสร้าง Prompt สติกเกอร์ไลน์",
+    description:
+      "สร้าง Prompt สติกเกอร์ 16 อารมณ์ เลือกธีม รูปแบบตัวอักษร และข้อความ พร้อมนำไปใช้กับ ChatGPT หรือ Gemini",
+    image: "/images/projects/line-sticker-prompt-preview.png",
+    technologies: ["Next.js", "TypeScript", "Prompt Design"],
+    overview:
+      "เครื่องมือทำงานใน Browser สำหรับเลือกธีม ตัวอักษร และแก้ข้อความ 16 ประโยค พร้อม Copy หรือดาวน์โหลด Prompt โดยไม่เชื่อมต่อ AI API",
+    href: "/line-sticker-prompt",
+    ctaLabel: "ลองใช้งาน",
+    imageFit: "contain",
+  },
   {
     title: "AI PORTRAIT PROMPT",
     subtitle: "Professional Portrait Prompt Builder",
