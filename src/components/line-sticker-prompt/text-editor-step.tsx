@@ -70,8 +70,8 @@ export function TextEditorStep({
       </div>
 
       <div className="rounded-[2rem] border border-violet-100 bg-white p-4 shadow-sm sm:p-6">
-        <div className="grid items-start gap-5 lg:grid-cols-[170px_minmax(0,1fr)_320px]">
-          <aside className="order-2 lg:order-1"><h3 className="mb-3 text-xs font-extrabold uppercase tracking-[0.12em] text-slate-500">เลือกภาพ</h3><StickerThumbnailList assets={assets} selectedIndex={selectedIndex} onSelect={onSelectedIndexChange} warningIndexes={warningIndexes} /></aside>
+        <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[170px_minmax(0,1fr)_320px]">
+          <aside className="order-2 min-w-0 lg:order-1"><h3 className="mb-3 text-xs font-extrabold uppercase tracking-[0.12em] text-slate-500">เลือกภาพ</h3><StickerThumbnailList assets={assets} selectedIndex={selectedIndex} onSelect={onSelectedIndexChange} warningIndexes={warningIndexes} /></aside>
 
           <div className="order-1 min-w-0 lg:order-2">
             <div className="mb-3 flex items-center justify-between gap-3"><h3 className="font-extrabold text-slate-900">Canvas {asset.filename}</h3><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${currentValidation?.textOverflow ? "bg-rose-100 text-rose-800" : currentValidation?.textNearEdge ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{currentValidation?.textOverflow ? "ข้อความล้น" : currentValidation?.textNearEdge ? "ใกล้ขอบ" : "อยู่ใน Safe Area"}</span></div>
@@ -82,7 +82,7 @@ export function TextEditorStep({
             </div>
           </div>
 
-          <aside className="order-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-24">
+          <aside className="order-3 min-w-0 rounded-3xl border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-24">
             <h3 className="font-extrabold text-slate-900">เครื่องมือข้อความ</h3>
             <label htmlFor="sticker-message" className="mt-4 block text-xs font-bold text-slate-700">ข้อความ
               <textarea id="sticker-message" rows={2} value={current.message} onChange={(event) => updateCurrent({ ...current, message: event.target.value })} className="mt-1 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />

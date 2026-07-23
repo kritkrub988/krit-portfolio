@@ -12,17 +12,29 @@ export type StickerTextStyle = {
   id: string
   nameEnglish: string
   nameThai: string
-  fontFamily: string
+  fontKey: StickerFontKey
   fontWeight: number
   fill: string
   stroke: string
   strokeWidth: number
-  shadow: boolean
   shadowColor: string
+  shadowBlur: number
+  shadowOffsetX: number
+  shadowOffsetY: number
   letterSpacing: number
   rotation: number
   gradient?: [string, string]
+  previewClass: string
 }
+
+export type StickerFontKey =
+  | "kodchasan"
+  | "mali"
+  | "mitr"
+  | "itim"
+  | "sriracha"
+  | "chakra-petch"
+  | "pattaya"
 
 export type StudioStep = 1 | 2 | 3 | 4 | 5
 

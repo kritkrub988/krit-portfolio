@@ -23,12 +23,14 @@ export function StickerTextCanvas({
 }: StickerTextCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [renderError, setRenderError] = useState("")
+  const [fontLoading, setFontLoading] = useState(true)
   const dragging = useRef(false)
 
   useEffect(() => {
     let cancelled = false
     const canvas = canvasRef.current
     if (!canvas) return
+    setFontLoading(true)
     void drawStickerComposition(canvas, asset.blob, settings, { showSafeArea: true })
       .then((status) => {
         if (cancelled) return
@@ -43,6 +45,9 @@ export function StickerTextCanvas({
       })
       .catch((cause) => {
         if (!cancelled) setRenderError(cause instanceof Error ? cause.message : "Preview ไม่สำเร็จ")
+      })
+      .finally(() => {
+        if (!cancelled) setFontLoading(false)
       })
     return () => {
       cancelled = true
@@ -79,7 +84,7 @@ export function StickerTextCanvas({
 
   return (
     <div>
-      <div className="sticker-checkerboard overflow-hidden rounded-3xl border border-violet-200 bg-white shadow-inner">
+      <div className="sticker-checkerboard relative overflow-hidden rounded-3xl border border-violet-200 bg-white shadow-inner">
         <canvas
           ref={canvasRef}
           aria-label={`Canvas แก้ข้อความ ${asset.filename} ลากเพื่อเปลี่ยนตำแหน่งข้อความ`}
@@ -99,6 +104,11 @@ export function StickerTextCanvas({
           onPointerCancel={() => { dragging.current = false }}
           onKeyDown={moveTextWithKeyboard}
         />
+        {fontLoading ? (
+          <div className="absolute inset-0 grid place-items-center bg-white/75 text-sm font-bold text-violet-700" role="status" aria-live="polite">
+            กำลังโหลดฟอนต์…
+          </div>
+        ) : null}
       </div>
       <p id="sticker-canvas-help" className="mt-2 text-center text-[11px] leading-5 text-slate-500">เส้นประสีเขียวคือ Safe Area • ลากบน Canvas หรือใช้ปุ่มลูกศรเพื่อย้ายข้อความ (กด Shift เพื่อขยับเร็วขึ้น)</p>
       {renderError ? <p role="alert" className="mt-2 text-center text-xs font-semibold text-rose-700">{renderError}</p> : null}

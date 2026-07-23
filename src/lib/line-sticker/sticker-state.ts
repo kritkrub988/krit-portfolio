@@ -27,7 +27,7 @@ export function createDefaultTextSetting(index: number): StickerTextSettings {
     strokeWidth: style.strokeWidth,
     fontSize: 46,
     letterSpacing: style.letterSpacing,
-    shadowEnabled: style.shadow,
+    shadowEnabled: style.shadowBlur > 0 || style.shadowOffsetX !== 0 || style.shadowOffsetY !== 0,
     shadowColor: style.shadowColor,
     x: 0.5,
     y: 0.82,
@@ -51,7 +51,7 @@ export function applyTextStyle(
     strokeColor: style.stroke,
     strokeWidth: style.strokeWidth,
     letterSpacing: style.letterSpacing,
-    shadowEnabled: style.shadow,
+    shadowEnabled: style.shadowBlur > 0 || style.shadowOffsetX !== 0 || style.shadowOffsetY !== 0,
     shadowColor: style.shadowColor,
     rotation: style.rotation,
   }

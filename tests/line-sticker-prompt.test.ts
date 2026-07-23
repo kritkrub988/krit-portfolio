@@ -9,6 +9,11 @@ import {
 import { defaultStickerMessages } from "../src/data/line-sticker/default-messages.ts"
 import { stickerEmotions } from "../src/data/line-sticker/emotions.ts"
 import {
+  getStickerFontCssFamily,
+  stickerFontFallbackOrder,
+  stickerFonts,
+} from "../src/data/line-sticker/sticker-fonts.ts"
+import {
   defaultStickerTextStyleId,
   stickerTextStyles,
 } from "../src/data/line-sticker/text-styles.ts"
@@ -94,6 +99,39 @@ test("preserves the required 16 Thai defaults and 24 Canvas text styles", () => 
   assert.deepEqual(createDefaultBackgroundRemovalSettings(), {
     color: { r: 255, g: 255, b: 255 }, tolerance: 45, edgeConnected: true, feather: 1,
   })
+})
+
+test("maps all 24 text styles to the seven required Thai fonts and exact weights", () => {
+  const expected = [
+    ["Kodchasan", 700], ["Mali", 500], ["Kodchasan", 700], ["Mitr", 700],
+    ["Mitr", 700], ["Kodchasan", 700], ["Mali", 600], ["Mitr", 600],
+    ["Kodchasan", 700], ["Itim", 400], ["Sriracha", 400], ["Mali", 600],
+    ["Kodchasan", 700], ["Sriracha", 400], ["Chakra Petch", 400], ["Mitr", 700],
+    ["Chakra Petch", 600], ["Itim", 400], ["Pattaya", 400], ["Mitr", 700],
+    ["Mali", 500], ["Itim", 400], ["Mali", 600], ["Pattaya", 400],
+  ]
+  assert.deepEqual(
+    stickerTextStyles.map((style) => [stickerFonts[style.fontKey].name, style.fontWeight]),
+    expected,
+  )
+  assert.equal(new Set(stickerTextStyles.map((style) => style.fontKey)).size, 7)
+  stickerTextStyles.forEach((style) => {
+    assert.ok(stickerFonts[style.fontKey].weights.includes(style.fontWeight))
+    assert.ok(style.previewClass.length > 0)
+    assert.ok(style.shadowBlur >= 0)
+  })
+})
+
+test("uses the required Thai fallback order and preserves every validation phrase", () => {
+  assert.deepEqual(stickerFontFallbackOrder, ["kodchasan", "mali", "mitr", "itim"])
+  const family = getStickerFontCssFamily("sriracha")
+  assert.match(family, /--font-sticker-sriracha/)
+  assert.match(family, /--font-sticker-kodchasan/)
+  assert.match(family, /"Noto Sans Thai", sans-serif/)
+  const samples = [
+    "สวัสดี", "ขอบคุณค่ะ", "ไม่เป็นไรนะ", "รอแป๊บนึง", "สู้ ๆ นะ", "ง่วงจัง", "ฝันดีค่า",
+  ]
+  samples.forEach((sample) => assert.equal(splitThaiGraphemes(sample).join(""), sample))
 })
 
 test("calculates ordered 4 by 4 crops for a square source", () => {

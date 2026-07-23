@@ -7,6 +7,7 @@ import { createStickerZip } from "@/lib/line-sticker/create-sticker-zip"
 import { downloadBlob } from "@/lib/line-sticker/browser-utils"
 import { blobHasTransparentPixel } from "@/lib/line-sticker/image-browser-utils"
 import { renderPngToSize, renderStickerToPng } from "@/lib/line-sticker/render-sticker-text"
+import { waitForStickerFontsForSettings } from "@/lib/line-sticker/sticker-fonts-browser"
 import { validateStickerFiles } from "@/lib/line-sticker/validate-sticker-files"
 import type {
   BrowserImageAsset,
@@ -48,6 +49,7 @@ export function ExportStep({
   const [tabBlob, setTabBlob] = useState<Blob | null>(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [busy, setBusy] = useState(true)
+  const [busyLabel, setBusyLabel] = useState("กำลังโหลดฟอนต์…")
   const [error, setError] = useState("")
   const previewRef = useRef<RenderedStickerPreview[]>([])
 
@@ -59,7 +61,11 @@ export function ExportStep({
         await Promise.resolve()
         if (cancelled) return
         setBusy(true)
+        setBusyLabel("กำลังโหลดฟอนต์…")
         setError("")
+        await waitForStickerFontsForSettings(textSettings)
+        if (cancelled) return
+        setBusyLabel("กำลังสร้าง Preview…")
         for (let index = 0; index < assets.length; index += 1) {
           const rendered = await renderStickerToPng(assets[index].blob, textSettings[index])
           const hasTransparency = await blobHasTransparentPixel(rendered.blob)
@@ -161,11 +167,11 @@ export function ExportStep({
           <h2 id="export-step-heading" className="mt-2 text-2xl font-extrabold text-slate-950 sm:text-3xl">ตรวจ Preview และดาวน์โหลด</h2>
           <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">ตรวจความโปร่งใส Safe Area และลำดับไฟล์ก่อน Export คุณยังดาวน์โหลดต่อได้เมื่อมี Warning หลังยืนยัน</p>
         </div>
-        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold ${summary.valid && !summary.warnings.length ? "bg-emerald-100 text-emerald-800" : summary.valid ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"}`}><FileCheck2 size={15} aria-hidden="true" />{busy ? "กำลังสร้าง Preview…" : summary.valid ? summary.warnings.length ? `${summary.warningFiles.length} ไฟล์มี Warning` : "พร้อมดาวน์โหลด" : "กำลังตรวจไฟล์"}</span>
+        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold ${summary.valid && !summary.warnings.length ? "bg-emerald-100 text-emerald-800" : summary.valid ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"}`}><FileCheck2 size={15} aria-hidden="true" />{busy ? busyLabel : summary.valid ? summary.warnings.length ? `${summary.warningFiles.length} ไฟล์มี Warning` : "พร้อมดาวน์โหลด" : "กำลังตรวจไฟล์"}</span>
       </div>
 
       {error ? <p role="alert" className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{error}</p> : null}
-      {busy && !previews.length ? <div className="mt-6 grid min-h-72 place-items-center rounded-3xl border border-dashed border-violet-200 bg-violet-50 text-sm font-bold text-violet-700">กำลัง Render ข้อความและตรวจ Alpha ทั้ง 16 ภาพ…</div> : null}
+      {busy && !previews.length ? <div className="mt-6 grid min-h-72 place-items-center rounded-3xl border border-dashed border-violet-200 bg-violet-50 text-sm font-bold text-violet-700">{busyLabel === "กำลังโหลดฟอนต์…" ? "กำลังโหลดฟอนต์สำหรับทั้ง 16 ภาพ…" : "กำลัง Render ข้อความและตรวจ Alpha ทั้ง 16 ภาพ…"}</div> : null}
       {previews.length === 16 ? (
         <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <ExportPreviewGrid previews={previews} selectedIndex={selectedIndex} onSelect={setSelectedIndex} onEdit={onEditSticker} />

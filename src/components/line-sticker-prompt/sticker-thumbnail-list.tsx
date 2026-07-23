@@ -17,7 +17,7 @@ export function StickerThumbnailList({
   warningIndexes = new Set(),
 }: StickerThumbnailListProps) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2 lg:grid lg:max-h-[640px] lg:grid-cols-2 lg:overflow-y-auto lg:pr-1" aria-label="รายการสติกเกอร์ 01 ถึง 16">
+    <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-2 lg:grid lg:max-h-[640px] lg:grid-cols-2 lg:overflow-y-auto lg:pr-1" aria-label="รายการสติกเกอร์ 01 ถึง 16">
       {assets.map((asset, index) => {
         const active = index === selectedIndex
         const warning = warningIndexes.has(index)

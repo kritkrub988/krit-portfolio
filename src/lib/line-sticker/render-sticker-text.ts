@@ -3,6 +3,7 @@
 import { stickerExportConfig } from "@/config/sticker-export"
 import { getStickerTextStyle } from "@/data/line-sticker/text-styles"
 import { canvasToPngBlob } from "@/lib/line-sticker/image-browser-utils"
+import { waitForStickerFont } from "@/lib/line-sticker/sticker-fonts-browser"
 import {
   assessTextBounds,
   calculateContainPlacement,
@@ -14,9 +15,11 @@ import type { StickerTextSettings, TextBounds } from "@/types/line-sticker"
 function configureTextContext(
   context: CanvasRenderingContext2D,
   settings: StickerTextSettings,
+  fontFamily: string,
 ) {
   const style = getStickerTextStyle(settings.styleId)
-  context.font = `${style.fontWeight} ${settings.fontSize}px ${style.fontFamily}`
+  const effectScale = settings.fontSize / 46
+  context.font = `${style.fontWeight} ${settings.fontSize}px ${fontFamily}`
   context.textAlign = "left"
   context.textBaseline = "middle"
   context.lineJoin = "round"
@@ -25,9 +28,9 @@ function configureTextContext(
   context.strokeStyle = settings.strokeColor
   context.fillStyle = settings.fillColor
   context.shadowColor = settings.shadowEnabled ? settings.shadowColor : "transparent"
-  context.shadowBlur = settings.shadowEnabled ? Math.max(3, settings.fontSize * 0.12) : 0
-  context.shadowOffsetX = settings.shadowEnabled ? Math.max(2, settings.fontSize * 0.055) : 0
-  context.shadowOffsetY = settings.shadowEnabled ? Math.max(2, settings.fontSize * 0.075) : 0
+  context.shadowBlur = settings.shadowEnabled ? style.shadowBlur * effectScale : 0
+  context.shadowOffsetX = settings.shadowEnabled ? style.shadowOffsetX * effectScale : 0
+  context.shadowOffsetY = settings.shadowEnabled ? style.shadowOffsetY * effectScale : 0
   return style
 }
 
@@ -40,18 +43,18 @@ function measureSpacedText(
   const widths = graphemes.map((grapheme) => context.measureText(grapheme).width)
   const width = widths.reduce((sum, value) => sum + value, 0) + Math.max(0, graphemes.length - 1) * letterSpacing
   const sampleMetrics = context.measureText(text || "ก")
-  const height =
-    (sampleMetrics.actualBoundingBoxAscent || 0) +
-      (sampleMetrics.actualBoundingBoxDescent || 0) ||
-    Number.parseFloat(context.font) * 1.2
-  return { graphemes, widths, width, height }
+  const fallbackHeight = Number.parseFloat(context.font) * 1.35
+  const ascent = sampleMetrics.actualBoundingBoxAscent || fallbackHeight * 0.75
+  const descent = sampleMetrics.actualBoundingBoxDescent || fallbackHeight * 0.25
+  return { graphemes, widths, width, height: ascent + descent, ascent, descent }
 }
 
 function drawSpacedText(
   context: CanvasRenderingContext2D,
   settings: StickerTextSettings,
+  fontFamily: string,
 ) {
-  const style = configureTextContext(context, settings)
+  const style = configureTextContext(context, settings, fontFamily)
   const measured = measureSpacedText(context, settings.message, settings.letterSpacing)
   let cursor = -measured.width / 2
   if (style.gradient) {
@@ -74,6 +77,12 @@ export async function drawStickerComposition(
   settings: StickerTextSettings,
   options: { showSafeArea?: boolean } = {},
 ) {
+  const style = getStickerTextStyle(settings.styleId)
+  const resolvedFont = await waitForStickerFont(
+    style.fontKey,
+    style.fontWeight,
+    settings.message,
+  )
   const width = stickerExportConfig.stickerCanvasWidth
   const height = stickerExportConfig.stickerCanvasHeight
   canvas.width = width
@@ -87,12 +96,16 @@ export async function drawStickerComposition(
   bitmap.close()
 
   context.save()
-  configureTextContext(context, settings)
+  configureTextContext(context, settings, resolvedFont.fontFamily)
   const measured = measureSpacedText(context, settings.message, settings.letterSpacing)
   const centerX = settings.x * width
   const centerY = settings.y * height
-  const paddedWidth = measured.width + settings.strokeWidth * 2
-  const paddedHeight = measured.height + settings.strokeWidth * 2
+  const effectScale = settings.fontSize / 46
+  const shadowExtent = settings.shadowEnabled
+    ? (style.shadowBlur + Math.max(Math.abs(style.shadowOffsetX), Math.abs(style.shadowOffsetY))) * effectScale
+    : 0
+  const paddedWidth = measured.width + (settings.strokeWidth + shadowExtent) * 2
+  const paddedHeight = measured.height + (settings.strokeWidth + shadowExtent) * 2
   const bounds = calculateRotatedTextBounds(
     centerX,
     centerY,
@@ -102,12 +115,71 @@ export async function drawStickerComposition(
   )
   context.translate(centerX, centerY)
   context.rotate((settings.rotation * Math.PI) / 180)
-  if (settings.message.trim()) drawSpacedText(context, settings)
+  if (settings.message.trim()) drawSpacedText(context, settings, resolvedFont.fontFamily)
   context.restore()
 
   const status = assessTextBounds(bounds, width, height, stickerExportConfig.safeMargin)
   if (options.showSafeArea) drawEditorOverlays(context, bounds, status.overflow, status.nearEdge)
   return { bounds, ...status }
+}
+
+export async function drawTextStylePreview(
+  canvas: HTMLCanvasElement,
+  styleId: string,
+  message: string,
+  cssWidth: number,
+  cssHeight: number,
+) {
+  const style = getStickerTextStyle(styleId)
+  const resolvedFont = await waitForStickerFont(style.fontKey, style.fontWeight, message)
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
+  canvas.width = Math.max(1, Math.round(cssWidth * pixelRatio))
+  canvas.height = Math.max(1, Math.round(cssHeight * pixelRatio))
+  canvas.style.width = `${cssWidth}px`
+  canvas.style.height = `${cssHeight}px`
+  const context = canvas.getContext("2d", { alpha: true })
+  if (!context) throw new Error("Canvas is not available in this browser")
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+  context.clearRect(0, 0, cssWidth, cssHeight)
+
+  const baseFontSize = 40
+  const createSettings = (fontSize: number): StickerTextSettings => ({
+    message,
+    styleId,
+    fillColor: style.fill,
+    strokeColor: style.stroke,
+    strokeWidth: style.strokeWidth * (fontSize / 46),
+    fontSize,
+    letterSpacing: style.letterSpacing * (fontSize / 46),
+    shadowEnabled: style.shadowBlur > 0 || style.shadowOffsetX !== 0 || style.shadowOffsetY !== 0,
+    shadowColor: style.shadowColor,
+    x: 0.5,
+    y: 0.5,
+    rotation: style.rotation,
+  })
+
+  let previewSettings = createSettings(baseFontSize)
+  configureTextContext(context, previewSettings, resolvedFont.fontFamily)
+  let measured = measureSpacedText(context, message, previewSettings.letterSpacing)
+  const effectSize = previewSettings.strokeWidth * 2 +
+    (style.shadowBlur + Math.abs(style.shadowOffsetX) + Math.abs(style.shadowOffsetY)) * (baseFontSize / 46)
+  const fitScale = Math.min(
+    1,
+    (cssWidth - 16) / Math.max(1, measured.width + effectSize),
+    (cssHeight - 10) / Math.max(1, measured.height + effectSize),
+  )
+  if (fitScale < 1) {
+    previewSettings = createSettings(Math.max(25, baseFontSize * fitScale))
+    configureTextContext(context, previewSettings, resolvedFont.fontFamily)
+    measured = measureSpacedText(context, message, previewSettings.letterSpacing)
+  }
+
+  context.save()
+  context.translate(cssWidth / 2, cssHeight / 2)
+  context.rotate((previewSettings.rotation * Math.PI) / 180)
+  drawSpacedText(context, previewSettings, resolvedFont.fontFamily)
+  context.restore()
+  return { measured, ...resolvedFont }
 }
 
 function drawEditorOverlays(
