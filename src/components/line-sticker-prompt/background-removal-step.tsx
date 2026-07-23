@@ -8,6 +8,7 @@ import {
   getAutomaticBackgroundColor,
   removeBackgroundFromBlob,
 } from "@/lib/line-sticker/image-browser-utils"
+import { createDefaultBackgroundRemovalSettings } from "@/lib/line-sticker/sticker-state"
 import type {
   BackgroundRemovalSettings,
   BrowserImageAsset,
@@ -184,6 +185,7 @@ export function BackgroundRemovalStep({
               <button type="button" onClick={applyCurrent} disabled={!previewBlob || busy} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-45"><Check size={15} aria-hidden="true" />ใช้ค่ากับภาพนี้</button>
               <button type="button" onClick={() => void applyAll()} disabled={busy} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-3 text-sm font-bold text-white shadow-lg shadow-pink-100 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-45"><RotateCcw size={16} aria-hidden="true" />{busy ? "กำลังประมวลผล…" : "ใช้ค่ากับทั้ง 16 ภาพ"}</button>
               <button type="button" onClick={undoCurrent} disabled={!transparentStickers[selectedIndex]} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 disabled:opacity-45"><Undo2 size={15} aria-hidden="true" />Undo ภาพนี้</button>
+              <button type="button" onClick={() => { onSettingsChange(createDefaultBackgroundRemovalSettings()); showToast("คืนค่าลบพื้นหลังเริ่มต้นแล้ว") }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500"><RotateCcw size={15} aria-hidden="true" />Reset ค่าลบพื้นหลัง</button>
             </div>
           </aside>
         </div>

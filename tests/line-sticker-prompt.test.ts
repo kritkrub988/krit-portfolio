@@ -18,6 +18,7 @@ import {
 } from "../src/data/line-sticker/themes.ts"
 import {
   buildStickerImagePrompt,
+  stickerImageMasterPrompt,
   stickerImagePromptFilename,
 } from "../src/lib/line-sticker/build-sticker-image-prompt.ts"
 import {
@@ -33,6 +34,7 @@ import {
 } from "../src/lib/line-sticker/remove-solid-background.ts"
 import {
   applyTextStyle,
+  createDefaultBackgroundRemovalSettings,
   createDefaultStickerTextSettings,
 } from "../src/lib/line-sticker/sticker-state.ts"
 import {
@@ -40,6 +42,7 @@ import {
   calculateContainPlacement,
   calculateRotatedTextBounds,
   estimateTextWidth,
+  splitThaiGraphemes,
 } from "../src/lib/line-sticker/text-layout.ts"
 import { validateStickerFiles } from "../src/lib/line-sticker/validate-sticker-files.ts"
 import type { BackgroundRemovalSettings, ExportValidationItem } from "../src/types/line-sticker.ts"
@@ -55,13 +58,25 @@ test("builds one concise image-only prompt with all 16 ordered emotions", () => 
   const prompt = buildStickerImagePrompt(defaultStickerThemeId)
   assert.match(prompt, /ใช้รูปภาพที่ฉันแนบเป็นภาพอ้างอิงหลัก/)
   assert.match(prompt, /Theme: Pastel Cute/)
-  assert.match(prompt, /01 ทักทาย — ยิ้มและโบกมือ/)
-  assert.match(prompt, /16 ฝันดี — หลับตาและกอดหมอน/)
-  assert.match(prompt, /ตาราง 4×4 ครบ 16 ช่อง/)
-  assert.match(prompt, /ไม่มีข้อความ ไม่มีตัวอักษร ไม่มีตัวเลข/)
+  assert.match(prompt, /01\. ทักทาย — ยิ้มอย่างเป็นมิตรและยกมือโบก/)
+  assert.match(prompt, /16\. ฝันดี — หลับตาและกอดหมอนขนาดเล็ก/)
+  assert.match(prompt, /ตาราง 4 คอลัมน์ × 4 แถว ให้มีครบ 16 ภาพ/)
+  assert.match(prompt, /ห้ามใส่ข้อความ ห้ามใส่ตัวอักษร ห้ามใส่ตัวเลข/)
   assert.doesNotMatch(prompt, /Text style|สวัสดีค่า/)
   assert.equal(stickerEmotions.length, 16)
   assert.equal(stickerImagePromptFilename, "line-sticker-image-prompt.txt")
+})
+
+test("substitutes only the two supported Master Prompt variables for every theme", () => {
+  assert.equal((stickerImageMasterPrompt.match(/\{\{THEME_NAME\}\}/g) ?? []).length, 1)
+  assert.equal((stickerImageMasterPrompt.match(/\{\{THEME_PROMPT\}\}/g) ?? []).length, 1)
+  stickerThemes.forEach((theme) => {
+    const prompt = buildStickerImagePrompt(theme.id)
+    assert.ok(prompt.includes(`Theme: ${theme.nameEnglish}`))
+    assert.ok(prompt.includes(theme.promptText))
+    assert.doesNotMatch(prompt, /\{\{[^}]+\}\}/)
+    assert.doesNotMatch(prompt, /TEXT_STYLE|ZIP|API Key/)
+  })
 })
 
 test("preserves the required 16 Thai defaults and 24 Canvas text styles", () => {
@@ -76,6 +91,9 @@ test("preserves the required 16 Thai defaults and 24 Canvas text styles", () => 
   assert.equal(settings.length, 16)
   assert.equal(settings[0].message, "สวัสดีค่า")
   assert.equal(applyTextStyle(settings[0], "candy-text").styleId, "candy-text")
+  assert.deepEqual(createDefaultBackgroundRemovalSettings(), {
+    color: { r: 255, g: 255, b: 255 }, tolerance: 45, edgeConnected: true, feather: 1,
+  })
 })
 
 test("calculates ordered 4 by 4 crops for a square source", () => {
@@ -153,6 +171,14 @@ test("text bounds distinguish safe short Thai text from long overflowing Thai te
   assert.equal(assessTextBounds(overflow, 370, 320, 18).overflow, true)
 })
 
+test("keeps Thai vowels and tone marks intact while segmenting text for Canvas", () => {
+  const text = "สวัสดีค่า เก่งที่สุด!"
+  const graphemes = splitThaiGraphemes(text)
+  assert.equal(graphemes.join(""), text)
+  assert.ok(graphemes.length < Array.from(text).length)
+  assert.ok(graphemes.some((grapheme) => grapheme.length > 1))
+})
+
 test("contain placement creates centered main and tab output without stretching or cropping", () => {
   const main = calculateContainPlacement(370, 320, stickerExportConfig.mainCanvasWidth, stickerExportConfig.mainCanvasHeight)
   const tab = calculateContainPlacement(370, 320, stickerExportConfig.tabCanvasWidth, stickerExportConfig.tabCanvasHeight)
@@ -212,4 +238,9 @@ test("validates all files before export and keeps warnings non-blocking", () => 
   assert.ok(blocked.errors.some((error) => error.includes("ครบ 16")))
   assert.ok(blocked.errors.some((error) => error.includes("main.png")))
   assert.ok(blocked.errors.some((error) => error.includes("tab.png")))
+  const reordered = validExportItems()
+  ;[reordered[0], reordered[1]] = [reordered[1], reordered[0]]
+  const outOfOrder = validateStickerFiles(reordered, true, true)
+  assert.equal(outOfOrder.valid, false)
+  assert.ok(outOfOrder.errors.some((error) => error.includes("ลำดับไฟล์ไม่ถูกต้อง")))
 })

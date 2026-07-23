@@ -7,16 +7,9 @@ import {
   assessTextBounds,
   calculateContainPlacement,
   calculateRotatedTextBounds,
+  splitThaiGraphemes,
 } from "@/lib/line-sticker/text-layout"
 import type { StickerTextSettings, TextBounds } from "@/types/line-sticker"
-
-function splitGraphemes(text: string) {
-  if (typeof Intl.Segmenter === "function") {
-    const segmenter = new Intl.Segmenter("th", { granularity: "grapheme" })
-    return [...segmenter.segment(text)].map((part) => part.segment)
-  }
-  return Array.from(text)
-}
 
 function configureTextContext(
   context: CanvasRenderingContext2D,
@@ -43,7 +36,7 @@ function measureSpacedText(
   text: string,
   letterSpacing: number,
 ) {
-  const graphemes = splitGraphemes(text)
+  const graphemes = splitThaiGraphemes(text)
   const widths = graphemes.map((grapheme) => context.measureText(grapheme).width)
   const width = widths.reduce((sum, value) => sum + value, 0) + Math.max(0, graphemes.length - 1) * letterSpacing
   const sampleMetrics = context.measureText(text || "ก")

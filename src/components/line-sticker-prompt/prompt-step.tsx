@@ -1,6 +1,6 @@
 "use client"
 
-import { Copy, Download, Info, RotateCcw, WandSparkles } from "lucide-react"
+import { Copy, Download, Info, RotateCcw } from "lucide-react"
 import { stickerImagePromptFilename } from "@/lib/line-sticker/build-sticker-image-prompt"
 import { copyTextToClipboard, downloadTextFile } from "@/lib/line-sticker/browser-utils"
 import { StepNavigation } from "./step-navigation"
@@ -9,9 +9,7 @@ import { ThemeSelector } from "./theme-selector"
 type PromptStepProps = {
   themeId: string
   generatedPrompt: string
-  isDirty: boolean
   onThemeChange: (themeId: string) => void
-  onGenerate: () => void
   onReset: () => void
   onNext: () => void
   showToast: (message: string) => void
@@ -20,9 +18,7 @@ type PromptStepProps = {
 export function PromptStep({
   themeId,
   generatedPrompt,
-  isDirty,
   onThemeChange,
-  onGenerate,
   onReset,
   onNext,
   showToast,
@@ -54,16 +50,11 @@ export function PromptStep({
                 ไม่มีข้อความในภาพ เพื่อให้ตัด ลบพื้นหลัง และใส่ภาษาไทยใน Browser ได้แม่นกว่า
               </p>
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs font-bold ${isDirty ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
-              {isDirty ? "Theme เปลี่ยนแล้ว" : "พร้อมใช้งาน"}
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+              อัปเดตตาม Theme แล้ว
             </span>
           </div>
-          {isDirty ? (
-            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-              กด “สร้าง Prompt” เพื่ออัปเดต Theme ล่าสุดก่อน Copy
-            </p>
-          ) : null}
-          <pre className="mt-4 max-h-[520px] overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-200 selection:bg-violet-500/40 sm:p-5">
+          <pre className="mt-4 max-h-[430px] overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-200 selection:bg-violet-500/40 sm:p-5">
             {generatedPrompt}
           </pre>
         </div>
@@ -71,13 +62,9 @@ export function PromptStep({
         <aside className="rounded-[2rem] border border-pink-100 bg-gradient-to-br from-pink-50 via-white to-sky-50 p-5 shadow-sm lg:sticky lg:top-24">
           <h3 className="text-lg font-extrabold text-slate-950">นำ Prompt ไปใช้อย่างไร</h3>
           <p className="mt-2 text-sm leading-7 text-slate-600">
-            คัดลอก Prompt แล้วนำไปวางพร้อมรูปอ้างอิงใน ChatGPT หรือ Gemini ด้วยตัวเอง เว็บไซต์ไม่ได้สร้างภาพด้วย AI โดยตรง
+            นำ Prompt นี้ไปวางใน ChatGPT, Gemini หรือ AI สร้างภาพที่รองรับรูปอ้างอิง พร้อมแนบรูปต้นฉบับของคุณ เมื่อได้ภาพ 4×4 แล้ว ให้นำภาพกลับมาตัดและแต่งต่อในขั้นถัดไป
           </p>
           <div className="mt-5 grid gap-2">
-            <button type="button" onClick={onGenerate} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">
-              <WandSparkles size={17} aria-hidden="true" />
-              สร้าง Prompt
-            </button>
             <button type="button" onClick={copyPrompt} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-bold text-white transition hover:bg-violet-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600">
               <Copy size={17} aria-hidden="true" />
               Copy Prompt

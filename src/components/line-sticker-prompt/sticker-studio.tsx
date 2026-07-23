@@ -9,7 +9,10 @@ import {
   revokeImageAsset,
   revokeImageAssets,
 } from "@/lib/line-sticker/image-browser-utils"
-import { createDefaultStickerTextSettings } from "@/lib/line-sticker/sticker-state"
+import {
+  createDefaultBackgroundRemovalSettings,
+  createDefaultStickerTextSettings,
+} from "@/lib/line-sticker/sticker-state"
 import type {
   BackgroundRemovalSettings,
   BrowserImageAsset,
@@ -26,13 +29,6 @@ import { PromptStep } from "./prompt-step"
 import { StudioStepper } from "./studio-stepper"
 import { TextEditorStep } from "./text-editor-step"
 
-const initialBackgroundSettings: BackgroundRemovalSettings = {
-  color: { r: 255, g: 255, b: 255 },
-  tolerance: 45,
-  edgeConnected: true,
-  feather: 1,
-}
-
 function emptyTransparentStickers() {
   return Array.from({ length: 16 }, () => null) as Array<BrowserImageAsset | null>
 }
@@ -43,7 +39,7 @@ export function StickerStudio() {
   const [sourceGridImage, setSourceGridImage] = useState<SourceGridImage | null>(null)
   const [cropSettings, setCropSettings] = useState<CropSettings>({ ...defaultCropSettings })
   const [croppedStickers, setCroppedStickers] = useState<BrowserImageAsset[]>([])
-  const [backgroundRemovalSettings, setBackgroundRemovalSettings] = useState<BackgroundRemovalSettings>({ ...initialBackgroundSettings })
+  const [backgroundRemovalSettings, setBackgroundRemovalSettings] = useState<BackgroundRemovalSettings>(createDefaultBackgroundRemovalSettings)
   const [transparentStickers, setTransparentStickers] = useState<Array<BrowserImageAsset | null>>(emptyTransparentStickers)
   const [stickerTextSettings, setStickerTextSettings] = useState<StickerTextSettings[]>(createDefaultStickerTextSettings)
   const [selectedMainSticker, setSelectedMainSticker] = useState(0)
@@ -55,9 +51,6 @@ export function StickerStudio() {
   const [toast, setToast] = useState("")
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resources = useRef({ sourceGridImage, croppedStickers, transparentStickers })
-
-  const draftPrompt = useMemo(() => buildStickerImagePrompt(selectedTheme), [selectedTheme])
-  const promptIsDirty = generatedPrompt !== draftPrompt
 
   useEffect(() => {
     resources.current = { sourceGridImage, croppedStickers, transparentStickers }
@@ -158,6 +151,11 @@ export function StickerStudio() {
     showToast("คืนค่า Theme และ Prompt เริ่มต้นแล้ว")
   }
 
+  function changeTheme(themeId: string) {
+    setSelectedTheme(themeId)
+    setGeneratedPrompt(buildStickerImagePrompt(themeId))
+  }
+
   function startOver() {
     if (sourceGridImage && !window.confirm("เริ่มใหม่แล้วงาน รูป และการตั้งค่าที่ยังไม่ได้ดาวน์โหลดจะหาย ต้องการดำเนินการต่อหรือไม่?")) return
     revokeImageAsset(sourceGridImage)
@@ -168,7 +166,7 @@ export function StickerStudio() {
     setSourceGridImage(null)
     setCropSettings({ ...defaultCropSettings })
     setCroppedStickers([])
-    setBackgroundRemovalSettings({ ...initialBackgroundSettings })
+    setBackgroundRemovalSettings(createDefaultBackgroundRemovalSettings())
     setTransparentStickers(emptyTransparentStickers())
     setStickerTextSettings(createDefaultStickerTextSettings())
     setSelectedMainSticker(0)
@@ -189,7 +187,7 @@ export function StickerStudio() {
     <section id="sticker-studio" className="scroll-mt-4 bg-[#fffafd] pb-16" aria-label="LINE Sticker Prompt and Studio">
       <StudioStepper currentStep={currentStep} maxCompletedStep={maxCompletedStep} onStepChange={moveToStep} onStartOver={startOver} />
       <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {currentStep === 1 ? <PromptStep themeId={selectedTheme} generatedPrompt={generatedPrompt} isDirty={promptIsDirty} onThemeChange={setSelectedTheme} onGenerate={() => { setGeneratedPrompt(draftPrompt); showToast("สร้าง Prompt แล้ว") }} onReset={resetPromptStep} onNext={() => completeAndMove(2)} showToast={showToast} /> : null}
+        {currentStep === 1 ? <PromptStep themeId={selectedTheme} generatedPrompt={generatedPrompt} onThemeChange={changeTheme} onReset={resetPromptStep} onNext={() => completeAndMove(2)} showToast={showToast} /> : null}
         {currentStep === 2 ? <GridCropStep source={sourceGridImage} cropSettings={cropSettings} croppedStickers={croppedStickers} onSourceChange={handleSourceChange} onCropSettingsChange={handleCropSettingsChange} onCroppedChange={handleCroppedChange} onBack={() => moveToStep(1)} onNext={() => completeAndMove(3)} showToast={showToast} /> : null}
         {currentStep === 3 ? <BackgroundRemovalStep croppedStickers={croppedStickers} transparentStickers={transparentStickers} settings={backgroundRemovalSettings} onSettingsChange={setBackgroundRemovalSettings} onTransparentChange={setTransparentStickers} onBack={() => moveToStep(2)} onNext={() => completeAndMove(4)} showToast={showToast} /> : null}
         {currentStep === 4 && readyTransparentAssets.length === 16 ? <TextEditorStep assets={readyTransparentAssets} settings={stickerTextSettings} selectedIndex={selectedTextSticker} validationResults={validationResults} onSelectedIndexChange={setSelectedTextSticker} onSettingsChange={setStickerTextSettings} onValidationChange={handleValidationChange} onBack={() => moveToStep(3)} onNext={() => completeAndMove(5)} showToast={showToast} /> : null}

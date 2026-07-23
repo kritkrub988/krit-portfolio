@@ -111,12 +111,15 @@ export function GridCropStep({
       </div>
 
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" className="sr-only" aria-label="เลือกภาพตารางสติกเกอร์ 4 คูณ 4" onChange={(event) => void selectFile(event.target.files?.[0])} />
+      <p className="mt-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs leading-6 text-sky-950">
+        ภาพนี้จะถูกประมวลผลบนอุปกรณ์ของคุณเท่านั้น เว็บไซต์ไม่อัปโหลดและไม่เก็บรูปไว้
+      </p>
 
       {!source ? (
         <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className="mt-7 flex min-h-56 w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed border-pink-200 bg-gradient-to-br from-pink-50 via-white to-sky-50 p-6 text-center transition hover:border-pink-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-500 disabled:opacity-50">
           <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-pink-600 shadow-sm"><ImagePlus size={27} aria-hidden="true" /></span>
           <span className="mt-4 text-base font-extrabold text-slate-900">เลือกภาพ 4×4 จากเครื่อง</span>
-          <span className="mt-2 max-w-lg text-xs leading-6 text-slate-500">ภาพจะถูกเปิดและประมวลผลใน Browser เท่านั้น ไม่ถูกส่งขึ้น Server</span>
+          <span className="mt-2 max-w-lg text-xs leading-6 text-slate-500">รองรับ PNG, JPG, JPEG และ WebP สูงสุด 20 MB</span>
         </button>
       ) : (
         <div className="mt-7 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">

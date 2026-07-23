@@ -3,7 +3,19 @@ import {
   defaultStickerTextStyleId,
   getStickerTextStyle,
 } from "../../data/line-sticker/text-styles.ts"
-import type { StickerTextSettings } from "../../types/line-sticker.ts"
+import type {
+  BackgroundRemovalSettings,
+  StickerTextSettings,
+} from "../../types/line-sticker.ts"
+
+export function createDefaultBackgroundRemovalSettings(): BackgroundRemovalSettings {
+  return {
+    color: { r: 255, g: 255, b: 255 },
+    tolerance: 45,
+    edgeConnected: true,
+    feather: 1,
+  }
+}
 
 export function createDefaultTextSetting(index: number): StickerTextSettings {
   const style = getStickerTextStyle(defaultStickerTextStyleId)

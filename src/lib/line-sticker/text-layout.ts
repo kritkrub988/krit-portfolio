@@ -1,10 +1,14 @@
 import type { TextBounds } from "../../types/line-sticker.ts"
 
-export function countTextGraphemes(text: string) {
+export function splitThaiGraphemes(text: string) {
   if (typeof Intl.Segmenter === "function") {
-    return [...new Intl.Segmenter("th", { granularity: "grapheme" }).segment(text)].length
+    return [...new Intl.Segmenter("th", { granularity: "grapheme" }).segment(text)].map((part) => part.segment)
   }
-  return Array.from(text).length
+  return Array.from(text)
+}
+
+export function countTextGraphemes(text: string) {
+  return splitThaiGraphemes(text).length
 }
 
 export function estimateTextWidth(text: string, fontSize: number, letterSpacing: number) {

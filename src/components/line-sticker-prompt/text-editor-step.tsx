@@ -71,9 +71,9 @@ export function TextEditorStep({
 
       <div className="rounded-[2rem] border border-violet-100 bg-white p-4 shadow-sm sm:p-6">
         <div className="grid items-start gap-5 lg:grid-cols-[170px_minmax(0,1fr)_320px]">
-          <aside><h3 className="mb-3 text-xs font-extrabold uppercase tracking-[0.12em] text-slate-500">เลือกภาพ</h3><StickerThumbnailList assets={assets} selectedIndex={selectedIndex} onSelect={onSelectedIndexChange} warningIndexes={warningIndexes} /></aside>
+          <aside className="order-2 lg:order-1"><h3 className="mb-3 text-xs font-extrabold uppercase tracking-[0.12em] text-slate-500">เลือกภาพ</h3><StickerThumbnailList assets={assets} selectedIndex={selectedIndex} onSelect={onSelectedIndexChange} warningIndexes={warningIndexes} /></aside>
 
-          <div className="min-w-0">
+          <div className="order-1 min-w-0 lg:order-2">
             <div className="mb-3 flex items-center justify-between gap-3"><h3 className="font-extrabold text-slate-900">Canvas {asset.filename}</h3><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${currentValidation?.textOverflow ? "bg-rose-100 text-rose-800" : currentValidation?.textNearEdge ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{currentValidation?.textOverflow ? "ข้อความล้น" : currentValidation?.textNearEdge ? "ใกล้ขอบ" : "อยู่ใน Safe Area"}</span></div>
             <StickerTextCanvas asset={asset} settings={current} onSettingsChange={updateCurrent} onValidationChange={onValidationChange} />
             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -82,7 +82,7 @@ export function TextEditorStep({
             </div>
           </div>
 
-          <aside className="rounded-3xl border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-24">
+          <aside className="order-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-24">
             <h3 className="font-extrabold text-slate-900">เครื่องมือข้อความ</h3>
             <label htmlFor="sticker-message" className="mt-4 block text-xs font-bold text-slate-700">ข้อความ
               <textarea id="sticker-message" rows={2} value={current.message} onChange={(event) => updateCurrent({ ...current, message: event.target.value })} className="mt-1 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
@@ -96,6 +96,8 @@ export function TextEditorStep({
             <RangeControl id="stroke-width" label="ความหนาขอบ" value={current.strokeWidth} min={0} max={14} suffix="px" onChange={(value) => updateCurrent({ ...current, strokeWidth: value })} />
             <RangeControl id="font-size" label="ขนาดตัวอักษร" value={current.fontSize} min={20} max={90} suffix="px" onChange={(value) => updateCurrent({ ...current, fontSize: value })} />
             <RangeControl id="letter-spacing" label="ระยะห่างตัวอักษร" value={current.letterSpacing} min={-2} max={8} suffix="px" onChange={(value) => updateCurrent({ ...current, letterSpacing: value })} />
+            <RangeControl id="text-position-x" label="ตำแหน่ง X" value={Math.round(current.x * 100)} min={0} max={100} suffix="%" onChange={(value) => updateCurrent({ ...current, x: value / 100 })} />
+            <RangeControl id="text-position-y" label="ตำแหน่ง Y" value={Math.round(current.y * 100)} min={0} max={100} suffix="%" onChange={(value) => updateCurrent({ ...current, y: value / 100 })} />
 
             <label htmlFor="text-shadow" className="mt-4 flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700"><input id="text-shadow" type="checkbox" checked={current.shadowEnabled} onChange={(event) => updateCurrent({ ...current, shadowEnabled: event.target.checked })} className="h-5 w-5 accent-violet-600" />เปิดเงาข้อความ</label>
             {current.shadowEnabled ? <label htmlFor="shadow-color" className="mt-3 block text-xs font-bold text-slate-700">สีเงา<input id="shadow-color" type="color" value={current.shadowColor} onChange={(event) => updateCurrent({ ...current, shadowColor: event.target.value })} className="mt-1 h-11 w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-1" /></label> : null}

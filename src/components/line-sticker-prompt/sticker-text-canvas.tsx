@@ -59,12 +59,31 @@ export function StickerTextCanvas({
     onSettingsChange({ ...settings, x, y })
   }
 
+  function moveTextWithKeyboard(event: React.KeyboardEvent<HTMLCanvasElement>) {
+    const movement = event.shiftKey ? 0.05 : 0.01
+    const offsets: Partial<Record<React.KeyboardEvent["key"], [number, number]>> = {
+      ArrowLeft: [-movement, 0],
+      ArrowRight: [movement, 0],
+      ArrowUp: [0, -movement],
+      ArrowDown: [0, movement],
+    }
+    const offset = offsets[event.key]
+    if (!offset) return
+    event.preventDefault()
+    onSettingsChange({
+      ...settings,
+      x: Math.max(0, Math.min(1, settings.x + offset[0])),
+      y: Math.max(0, Math.min(1, settings.y + offset[1])),
+    })
+  }
+
   return (
     <div>
       <div className="sticker-checkerboard overflow-hidden rounded-3xl border border-violet-200 bg-white shadow-inner">
         <canvas
           ref={canvasRef}
           aria-label={`Canvas แก้ข้อความ ${asset.filename} ลากเพื่อเปลี่ยนตำแหน่งข้อความ`}
+          aria-describedby="sticker-canvas-help"
           className="block h-auto w-full touch-none cursor-move"
           tabIndex={0}
           onPointerDown={(event) => {
@@ -78,9 +97,10 @@ export function StickerTextCanvas({
             event.currentTarget.releasePointerCapture(event.pointerId)
           }}
           onPointerCancel={() => { dragging.current = false }}
+          onKeyDown={moveTextWithKeyboard}
         />
       </div>
-      <p className="mt-2 text-center text-[11px] leading-5 text-slate-500">เส้นประสีเขียวคือ Safe Area • ลากบน Canvas เพื่อย้ายข้อความ</p>
+      <p id="sticker-canvas-help" className="mt-2 text-center text-[11px] leading-5 text-slate-500">เส้นประสีเขียวคือ Safe Area • ลากบน Canvas หรือใช้ปุ่มลูกศรเพื่อย้ายข้อความ (กด Shift เพื่อขยับเร็วขึ้น)</p>
       {renderError ? <p role="alert" className="mt-2 text-center text-xs font-semibold text-rose-700">{renderError}</p> : null}
     </div>
   )

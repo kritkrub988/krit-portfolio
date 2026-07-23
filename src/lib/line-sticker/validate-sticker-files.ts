@@ -15,9 +15,13 @@ export function validateStickerFiles(
 
   if (items.length !== 16) errors.push(`ต้องมีภาพครบ 16 ภาพ (พบ ${items.length})`)
   const expectedNames = Array.from({ length: 16 }, (_, index) => formatStickerFilename(index + 1))
-  expectedNames.forEach((filename) => {
+  expectedNames.forEach((filename, index) => {
     if (!items.some((item) => item.filename === filename)) errors.push(`ไม่พบไฟล์ ${filename}`)
+    if (items[index] && items[index].filename !== filename) {
+      errors.push(`ลำดับไฟล์ไม่ถูกต้อง: ตำแหน่ง ${index + 1} ต้องเป็น ${filename}`)
+    }
   })
+  if (new Set(items.map((item) => item.filename)).size !== items.length) errors.push("พบชื่อไฟล์ซ้ำ")
 
   items.forEach((item) => {
     if (item.isEmpty) errors.push(`${item.filename} ไม่มีข้อมูลภาพ`)
