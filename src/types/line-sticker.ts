@@ -1,4 +1,4 @@
-export type StickerTheme = {
+export type StickerVisualStyle = {
   id: string
   nameEnglish: string
   nameThai: string
@@ -6,6 +6,24 @@ export type StickerTheme = {
   promptText: string
   colors: [string, string, string]
   motif: "hearts" | "clouds" | "stars" | "candy" | "doodle" | "minimal" | "pop" | "kawaii" | "soft-3d"
+}
+
+export type StickerPackMode = "single" | "animal" | "pair"
+
+export type StickerPackItem = {
+  id: number
+  text: string
+  action: string
+}
+
+export type StickerPack = {
+  id: string
+  name: string
+  description: string
+  characterMode: StickerPackMode
+  icon?: string
+  previewTexts: string[]
+  items: StickerPackItem[]
 }
 
 export type StickerTextStyle = {

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import test from "node:test"
 
 import {
@@ -6,8 +7,11 @@ import {
   formatStickerFilename,
   stickerExportConfig,
 } from "../src/config/sticker-export.ts"
-import { defaultStickerMessages } from "../src/data/line-sticker/default-messages.ts"
-import { stickerEmotions } from "../src/data/line-sticker/emotions.ts"
+import {
+  defaultStickerPackId,
+  getStickerPack,
+  stickerPacks,
+} from "../src/data/line-sticker/sticker-packs.ts"
 import {
   getStickerFontCssFamily,
   stickerFontFallbackOrder,
@@ -18,13 +22,13 @@ import {
   stickerTextStyles,
 } from "../src/data/line-sticker/text-styles.ts"
 import {
-  defaultStickerThemeId,
-  stickerThemes,
+  defaultStickerVisualStyleId,
+  stickerVisualStyles,
 } from "../src/data/line-sticker/themes.ts"
 import {
   buildStickerImagePrompt,
-  stickerImageMasterPrompt,
   stickerImagePromptFilename,
+  stickerPromptIntros,
 } from "../src/lib/line-sticker/build-sticker-image-prompt.ts"
 import {
   calculateGridCropRects,
@@ -39,8 +43,10 @@ import {
 } from "../src/lib/line-sticker/remove-solid-background.ts"
 import {
   applyTextStyle,
+  applyStickerPackMessages,
   createDefaultBackgroundRemovalSettings,
   createDefaultStickerTextSettings,
+  stickerTextSettingsMatchPack,
 } from "../src/lib/line-sticker/sticker-state.ts"
 import {
   assessTextBounds,
@@ -52,49 +58,92 @@ import {
 import { validateStickerFiles } from "../src/lib/line-sticker/validate-sticker-files.ts"
 import type { BackgroundRemovalSettings, ExportValidationItem } from "../src/types/line-sticker.ts"
 
-test("keeps the required 12 themes and defaults to Pastel Cute", () => {
-  assert.equal(stickerThemes.length, 12)
-  assert.equal(new Set(stickerThemes.map((theme) => theme.id)).size, 12)
-  assert.equal(stickerThemes.find((theme) => theme.id === defaultStickerThemeId)?.nameEnglish, "Pastel Cute")
-  stickerThemes.forEach((theme) => assert.ok(theme.promptText.length > 20))
-})
-
-test("builds one concise image-only prompt with all 16 ordered emotions", () => {
-  const prompt = buildStickerImagePrompt(defaultStickerThemeId)
-  assert.match(prompt, /ใช้รูปภาพที่ฉันแนบเป็นภาพอ้างอิงหลัก/)
-  assert.match(prompt, /Theme: Pastel Cute/)
-  assert.match(prompt, /01\. ทักทาย — ยิ้มอย่างเป็นมิตรและยกมือโบก/)
-  assert.match(prompt, /16\. ฝันดี — หลับตาและกอดหมอนขนาดเล็ก/)
-  assert.match(prompt, /ตาราง 4 คอลัมน์ × 4 แถว ให้มีครบ 16 ภาพ/)
-  assert.match(prompt, /ห้ามใส่ข้อความ ห้ามใส่ตัวอักษร ห้ามใส่ตัวเลข/)
-  assert.doesNotMatch(prompt, /Text style|สวัสดีค่า/)
-  assert.equal(stickerEmotions.length, 16)
-  assert.equal(stickerImagePromptFilename, "line-sticker-image-prompt.txt")
-})
-
-test("substitutes only the two supported Master Prompt variables for every theme", () => {
-  assert.equal((stickerImageMasterPrompt.match(/\{\{THEME_NAME\}\}/g) ?? []).length, 1)
-  assert.equal((stickerImageMasterPrompt.match(/\{\{THEME_PROMPT\}\}/g) ?? []).length, 1)
-  stickerThemes.forEach((theme) => {
-    const prompt = buildStickerImagePrompt(theme.id)
-    assert.ok(prompt.includes(`Theme: ${theme.nameEnglish}`))
-    assert.ok(prompt.includes(theme.promptText))
-    assert.doesNotMatch(prompt, /\{\{[^}]+\}\}/)
-    assert.doesNotMatch(prompt, /TEXT_STYLE|ZIP|API Key/)
+test("keeps 12 valid sticker packs with ordered 16-item data", () => {
+  assert.equal(stickerPacks.length, 12)
+  assert.equal(new Set(stickerPacks.map((pack) => pack.id)).size, 12)
+  assert.equal(defaultStickerPackId, "daily-chat")
+  stickerPacks.forEach((pack) => {
+    assert.equal(pack.items.length, 16)
+    assert.deepEqual(pack.items.map((item) => item.id), Array.from({ length: 16 }, (_, index) => index + 1))
+    assert.equal(pack.previewTexts.length, 3)
   })
 })
 
-test("preserves the required 16 Thai defaults and 24 Canvas text styles", () => {
-  assert.deepEqual(defaultStickerMessages, [
-    "สวัสดีค่า", "ขอบคุณค่า", "ขอโทษน้า", "ได้เลยค่า", "โอเคเลย", "ไม่เป็นไรน้า",
-    "รอแป๊บนึง", "ถึงแล้วน้า", "ไปก่อนนะ", "เย้!", "สู้ ๆ นะ", "หิวแล้ววว",
-    "ง่วงจัง", "คิดถึงจัง", "รักนะ", "ฝันดีค่า",
-  ])
+test("keeps the original 12 visual styles and defaults to Pastel Cute", () => {
+  assert.equal(stickerVisualStyles.length, 12)
+  assert.equal(new Set(stickerVisualStyles.map((visualStyle) => visualStyle.id)).size, 12)
+  assert.equal(defaultStickerVisualStyleId, "pastel-cute")
+  assert.equal(stickerVisualStyles.find((visualStyle) => visualStyle.id === defaultStickerVisualStyleId)?.nameEnglish, "Pastel Cute")
+  stickerVisualStyles.forEach((visualStyle) => assert.ok(visualStyle.promptText.length > 20))
+})
+
+test("builds the default prompt from the selected pack and visual style", () => {
+  const prompt = buildStickerImagePrompt(defaultStickerPackId, defaultStickerVisualStyleId)
+  assert.match(prompt, /ใช้รูปภาพที่ฉันแนบเป็นภาพอ้างอิงหลัก/)
+  assert.match(prompt, /Visual Style: Pastel Cute \(พาสเทลน่ารัก\)/)
+  assert.match(prompt, /01\. สวัสดี — ยิ้มสดใส ยกมือโบกทักทายอย่างเป็นมิตร/)
+  assert.match(prompt, /16\. บ๊ายบาย — โบกมือทั้งสองข้าง ยิ้มร่าเริง/)
+  assert.match(prompt, /ตาราง 4 คอลัมน์ × 4 แถว ให้มีครบ 16 ภาพ/)
+  assert.match(prompt, /ห้ามใส่ข้อความ ห้ามใส่ตัวอักษร ห้ามใส่ตัวเลข/)
+  assert.equal((prompt.match(/^\d{2}\. /gm) ?? []).length, 16)
+  assert.equal(stickerImagePromptFilename, "line-sticker-image-prompt.txt")
+})
+
+test("switching sticker packs updates all 16 preview items and prompt without coupling visual style", () => {
+  const currentVisualStyleId = "soft-3d"
+  const firstPack = getStickerPack("daily-chat")
+  const nextPack = getStickerPack("cute-orange-cat")
+  assert.notDeepEqual(nextPack.items, firstPack.items)
+  assert.equal(nextPack.items.length, 16)
+  const prompt = buildStickerImagePrompt(nextPack.id, currentVisualStyleId)
+  assert.match(prompt, /01\. เหมียว สวัสดี —/)
+  assert.match(prompt, /16\. ฝันดีเหมียว —/)
+  assert.match(prompt, /Visual Style: Soft 3D/)
+})
+
+test("switching visual style updates only the prompt style content", () => {
+  const packId = "polite-work"
+  const pastelPrompt = buildStickerImagePrompt(packId, "pastel-cute")
+  const lavenderPrompt = buildStickerImagePrompt(packId, "lavender")
+  assert.match(lavenderPrompt, /Visual Style: Lavender/)
+  assert.ok(lavenderPrompt.includes(stickerVisualStyles.find((style) => style.id === "lavender")!.promptText))
+  assert.match(pastelPrompt, /01\. สวัสดีค่ะ —/)
+  assert.match(lavenderPrompt, /01\. สวัสดีค่ะ —/)
+})
+
+test("uses distinct single, animal and pair intros", () => {
+  assert.match(buildStickerImagePrompt("daily-chat", "pastel-cute"), new RegExp(stickerPromptIntros.single.slice(0, 40)))
+  assert.match(buildStickerImagePrompt("chubby-animal", "pastel-cute"), /ใช้รูปภาพสัตว์ที่ฉันแนบ/)
+  assert.match(buildStickerImagePrompt("cute-orange-cat", "pastel-cute"), /สามารถใช้โทนแมวส้ม/)
+  assert.match(buildStickerImagePrompt("duo-friends-couple", "pastel-cute"), /สร้างตัวละครสติกเกอร์คู่จำนวน 2 ตัว/)
+  assert.match(buildStickerImagePrompt("duo-friends-couple", "pastel-cute"), /รักษาความสัมพันธ์และปฏิสัมพันธ์/)
+})
+
+test("does not duplicate the former hardcoded 16-item list in the prompt builder", () => {
+  const builderSource = readFileSync(
+    new URL("../src/lib/line-sticker/build-sticker-image-prompt.ts", import.meta.url),
+    "utf8",
+  )
+  assert.doesNotMatch(builderSource, /stickerEmotions|defaultStickerMessages/)
+  assert.doesNotMatch(builderSource, /ทักทาย[\s\S]*ยิ้มอย่างเป็นมิตรและยกมือโบก/)
+  assert.match(builderSource, /stickerPack\.items/)
+})
+
+test("uses sticker pack messages as editor defaults and preserves all 24 Canvas text styles", () => {
   assert.equal(stickerTextStyles.length, 24)
   assert.equal(defaultStickerTextStyleId, "bold-rounded")
   const settings = createDefaultStickerTextSettings()
   assert.equal(settings.length, 16)
-  assert.equal(settings[0].message, "สวัสดีค่า")
+  assert.deepEqual(
+    settings.map((setting) => setting.message),
+    getStickerPack(defaultStickerPackId).items.map((item) => item.text),
+  )
+  assert.equal(stickerTextSettingsMatchPack(settings, defaultStickerPackId), true)
+  settings[0] = { ...settings[0], message: "แก้เองแล้ว" }
+  assert.equal(stickerTextSettingsMatchPack(settings, defaultStickerPackId), false)
+  const replaced = applyStickerPackMessages(settings, "cute-girl")
+  assert.equal(replaced[0].message, "สวัสดีค่า")
+  assert.equal(replaced[15].message, "บ๊ายบายค่า")
   assert.equal(applyTextStyle(settings[0], "candy-text").styleId, "candy-text")
   assert.deepEqual(createDefaultBackgroundRemovalSettings(), {
     color: { r: 255, g: 255, b: 255 }, tolerance: 45, edgeConnected: true, feather: 1,

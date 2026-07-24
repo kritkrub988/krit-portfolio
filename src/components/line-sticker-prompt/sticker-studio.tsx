@@ -2,7 +2,14 @@
 
 import { CheckCircle2, ShieldAlert } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { defaultStickerThemeId } from "@/data/line-sticker/themes"
+import {
+  defaultStickerPackId,
+  getStickerPack,
+} from "@/data/line-sticker/sticker-packs"
+import {
+  defaultStickerVisualStyleId,
+  getStickerVisualStyle,
+} from "@/data/line-sticker/themes"
 import { buildStickerImagePrompt } from "@/lib/line-sticker/build-sticker-image-prompt"
 import { defaultCropSettings } from "@/lib/line-sticker/crop-sticker-grid"
 import {
@@ -12,6 +19,8 @@ import {
 import {
   createDefaultBackgroundRemovalSettings,
   createDefaultStickerTextSettings,
+  applyStickerPackMessages,
+  stickerTextSettingsMatchPack,
 } from "@/lib/line-sticker/sticker-state"
 import type {
   BackgroundRemovalSettings,
@@ -34,8 +43,8 @@ function emptyTransparentStickers() {
 }
 
 export function StickerStudio() {
-  const [selectedTheme, setSelectedTheme] = useState(defaultStickerThemeId)
-  const [generatedPrompt, setGeneratedPrompt] = useState(() => buildStickerImagePrompt(defaultStickerThemeId))
+  const [selectedStickerPackId, setSelectedStickerPackId] = useState(defaultStickerPackId)
+  const [selectedVisualStyleId, setSelectedVisualStyleId] = useState(defaultStickerVisualStyleId)
   const [sourceGridImage, setSourceGridImage] = useState<SourceGridImage | null>(null)
   const [cropSettings, setCropSettings] = useState<CropSettings>({ ...defaultCropSettings })
   const [croppedStickers, setCroppedStickers] = useState<BrowserImageAsset[]>([])
@@ -51,6 +60,18 @@ export function StickerStudio() {
   const [toast, setToast] = useState("")
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resources = useRef({ sourceGridImage, croppedStickers, transparentStickers })
+  const selectedStickerPack = useMemo(
+    () => getStickerPack(selectedStickerPackId),
+    [selectedStickerPackId],
+  )
+  const selectedVisualStyle = useMemo(
+    () => getStickerVisualStyle(selectedVisualStyleId),
+    [selectedVisualStyleId],
+  )
+  const generatedPrompt = useMemo(
+    () => buildStickerImagePrompt(selectedStickerPackId, selectedVisualStyleId),
+    [selectedStickerPackId, selectedVisualStyleId],
+  )
 
   useEffect(() => {
     resources.current = { sourceGridImage, croppedStickers, transparentStickers }
@@ -96,7 +117,7 @@ export function StickerStudio() {
     revokeImageAssets(transparentStickers)
     setCroppedStickers([])
     setTransparentStickers(emptyTransparentStickers())
-    setStickerTextSettings(createDefaultStickerTextSettings())
+    setStickerTextSettings(createDefaultStickerTextSettings(selectedStickerPackId))
     setValidationResults([])
     setSelectedMainSticker(0)
     setSelectedTabSticker(0)
@@ -122,7 +143,7 @@ export function StickerStudio() {
     revokeImageAssets(transparentStickers)
     setCroppedStickers(nextAssets)
     setTransparentStickers(emptyTransparentStickers())
-    setStickerTextSettings(createDefaultStickerTextSettings())
+    setStickerTextSettings(createDefaultStickerTextSettings(selectedStickerPackId))
     setValidationResults([])
     setMaxCompletedStep(2)
   }
@@ -146,14 +167,34 @@ export function StickerStudio() {
   }, [])
 
   function resetPromptStep() {
-    setSelectedTheme(defaultStickerThemeId)
-    setGeneratedPrompt(buildStickerImagePrompt(defaultStickerThemeId))
-    showToast("คืนค่า Theme และ Prompt เริ่มต้นแล้ว")
+    const messagesWereEdited = !stickerTextSettingsMatchPack(
+      stickerTextSettings,
+      selectedStickerPackId,
+    )
+    if (
+      messagesWereEdited &&
+      !window.confirm("คุณแก้ข้อความสติกเกอร์แล้ว ต้องการแทนที่ทั้ง 16 ข้อด้วยชุดเริ่มต้นหรือไม่?")
+    ) return
+
+    setSelectedStickerPackId(defaultStickerPackId)
+    setSelectedVisualStyleId(defaultStickerVisualStyleId)
+    setStickerTextSettings((current) => applyStickerPackMessages(current, defaultStickerPackId))
+    showToast("คืนค่าชุดสติกเกอร์ สไตล์ภาพ และ Prompt เริ่มต้นแล้ว")
   }
 
-  function changeTheme(themeId: string) {
-    setSelectedTheme(themeId)
-    setGeneratedPrompt(buildStickerImagePrompt(themeId))
+  function changeStickerPack(stickerPackId: string) {
+    if (stickerPackId === selectedStickerPackId) return
+    const messagesWereEdited = !stickerTextSettingsMatchPack(
+      stickerTextSettings,
+      selectedStickerPackId,
+    )
+    if (
+      messagesWereEdited &&
+      !window.confirm("คุณแก้ข้อความสติกเกอร์แล้ว ต้องการแทนที่ทั้ง 16 ข้อด้วยชุดที่เลือกใหม่หรือไม่?")
+    ) return
+
+    setSelectedStickerPackId(stickerPackId)
+    setStickerTextSettings((current) => applyStickerPackMessages(current, stickerPackId))
   }
 
   function startOver() {
@@ -161,14 +202,14 @@ export function StickerStudio() {
     revokeImageAsset(sourceGridImage)
     revokeImageAssets(croppedStickers)
     revokeImageAssets(transparentStickers)
-    setSelectedTheme(defaultStickerThemeId)
-    setGeneratedPrompt(buildStickerImagePrompt(defaultStickerThemeId))
+    setSelectedStickerPackId(defaultStickerPackId)
+    setSelectedVisualStyleId(defaultStickerVisualStyleId)
     setSourceGridImage(null)
     setCropSettings({ ...defaultCropSettings })
     setCroppedStickers([])
     setBackgroundRemovalSettings(createDefaultBackgroundRemovalSettings())
     setTransparentStickers(emptyTransparentStickers())
-    setStickerTextSettings(createDefaultStickerTextSettings())
+    setStickerTextSettings(createDefaultStickerTextSettings(defaultStickerPackId))
     setSelectedMainSticker(0)
     setSelectedTabSticker(0)
     setValidationResults([])
@@ -187,7 +228,18 @@ export function StickerStudio() {
     <section id="sticker-studio" className="scroll-mt-4 bg-[#fffafd] pb-16" aria-label="LINE Sticker Prompt and Studio">
       <StudioStepper currentStep={currentStep} maxCompletedStep={maxCompletedStep} onStepChange={moveToStep} onStartOver={startOver} />
       <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        {currentStep === 1 ? <PromptStep themeId={selectedTheme} generatedPrompt={generatedPrompt} onThemeChange={changeTheme} onReset={resetPromptStep} onNext={() => completeAndMove(2)} showToast={showToast} /> : null}
+        {currentStep === 1 ? (
+          <PromptStep
+            selectedStickerPack={selectedStickerPack}
+            selectedVisualStyle={selectedVisualStyle}
+            generatedPrompt={generatedPrompt}
+            onStickerPackChange={changeStickerPack}
+            onVisualStyleChange={setSelectedVisualStyleId}
+            onReset={resetPromptStep}
+            onNext={() => completeAndMove(2)}
+            showToast={showToast}
+          />
+        ) : null}
         {currentStep === 2 ? <GridCropStep source={sourceGridImage} cropSettings={cropSettings} croppedStickers={croppedStickers} onSourceChange={handleSourceChange} onCropSettingsChange={handleCropSettingsChange} onCroppedChange={handleCroppedChange} onBack={() => moveToStep(1)} onNext={() => completeAndMove(3)} showToast={showToast} /> : null}
         {currentStep === 3 ? <BackgroundRemovalStep croppedStickers={croppedStickers} transparentStickers={transparentStickers} settings={backgroundRemovalSettings} onSettingsChange={setBackgroundRemovalSettings} onTransparentChange={setTransparentStickers} onBack={() => moveToStep(2)} onNext={() => completeAndMove(4)} showToast={showToast} /> : null}
         {currentStep === 4 && readyTransparentAssets.length === 16 ? <TextEditorStep assets={readyTransparentAssets} settings={stickerTextSettings} selectedIndex={selectedTextSticker} validationResults={validationResults} onSelectedIndexChange={setSelectedTextSticker} onSettingsChange={setStickerTextSettings} onValidationChange={handleValidationChange} onBack={() => moveToStep(3)} onNext={() => completeAndMove(5)} showToast={showToast} /> : null}

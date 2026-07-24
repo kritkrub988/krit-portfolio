@@ -1,7 +1,7 @@
 import { Crop, Download, ExternalLink, ImageMinus, MessageSquareText, ShieldAlert } from "lucide-react"
 
 const howToSteps = [
-  { title: "สร้าง Prompt", description: "เลือก Theme แล้วนำ Prompt พร้อมรูปอ้างอิงไปใช้กับ ChatGPT หรือ Gemini เอง", icon: ExternalLink, color: "bg-violet-100 text-violet-700" },
+  { title: "สร้าง Prompt", description: "เลือกชุดสติกเกอร์และสไตล์ภาพ แล้วนำ Prompt พร้อมรูปอ้างอิงไปใช้กับ ChatGPT หรือ Gemini เอง", icon: ExternalLink, color: "bg-violet-100 text-violet-700" },
   { title: "ตัดตาราง 4×4", description: "เลือกภาพจากเครื่อง ปรับขอบและช่องว่าง แล้ว Crop เป็น 01.png–16.png", icon: Crop, color: "bg-sky-100 text-sky-700" },
   { title: "ลบพื้นหลัง", description: "เลือกสี ปรับ Tolerance และใช้ Flood Fill จากขอบเพื่อรักษารายละเอียดภายใน", icon: ImageMinus, color: "bg-emerald-100 text-emerald-700" },
   { title: "ใส่ข้อความ", description: "แก้ข้อความไทย เลือก Style ลากตำแหน่ง และตรวจ Safe Area ทีละภาพ", icon: MessageSquareText, color: "bg-pink-100 text-pink-700" },
